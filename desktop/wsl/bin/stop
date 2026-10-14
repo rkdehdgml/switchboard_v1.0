@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Stops the Switchboard server started by `start` (SIGTERM, then SIGKILL after 12s).
+# Touches ONLY the pid in the pidfile, and only if it still looks like our server.
+# tmux sessions are never killed: they survive the server by design.
+set -euo pipefail
+
+SB_HOME="${SWITCHBOARD_HOME:-$HOME/.switchboard}"
+SB_HOME="${SB_HOME/#\~/$HOME}"   # allow a leading ~ (the Windows side cannot expand it)
+PIDFILE="$SB_HOME/run/server.pid"
+
+[ -f "$PIDFILE" ] || { echo "stop: not running"; exit 0; }
+pid="$(cat "$PIDFILE" 2>/dev/null || true)"
+case "$pid" in ''|*[!0-9]*) rm -f "$PIDFILE"; echo "stop: stale pidfile removed"; exit 0 ;; esac
+
+if [ ! -r "/proc/$pid/cmdline" ] || ! tr '\0' ' ' < "/proc/$pid/cmdline" | grep -q -- '--desktop'; then
+  rm -f "$PIDFILE"
+  echo "stop: pid $pid is not a Switchboard server (pidfile removed, nothing signalled)"
+  exit 0
+fi
+
+# The server may be a wrapper plus a child (dev runs node via tsx): remember the children now,
+# signal only the verified pid and what hangs under it, never anything else.
+descendants() { for c in $(pgrep -P "$1" 2>/dev/null); do echo "$c"; descendants "$c"; done; }
+kids="$(descendants "$pid" | tr '\n' ' ')"
+
+kill -TERM "$pid" 2>/dev/null || true
+alive() { kill -0 "$pid" 2>/dev/null; for k in $kids; do kill -0 "$k" 2>/dev/null && return 0; done; kill -0 "$pid" 2>/dev/null; }
+for _ in $(seq 1 120); do
+  alive || { rm -f "$PIDFILE"; echo "stop: stopped pid $pid"; exit 0; }
+  sleep 0.1
+done
+for k in $kids "$pid"; do kill -KILL "$k" 2>/dev/null || true; done
+rm -f "$PIDFILE"
+echo "stop: killed pid $pid"

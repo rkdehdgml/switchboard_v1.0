@@ -23,33 +23,34 @@ function loadPolicy() {
 }
 
 describe('vertical tab orientation policy', () => {
-  it('honors vertical on desktop and tablet but forces phones horizontal', () => {
+  it('always gives desktop and tablet the rail, whatever an old stored setting says, and phones the strip', () => {
     const policy = loadPolicy();
-    expect(policy.resolveTabOrientation({ deviceType: 'desktop', setting: 'vertical' })).toBe('vertical');
-    expect(policy.resolveTabOrientation({ deviceType: 'tablet', setting: 'vertical' })).toBe('vertical');
-    expect(policy.resolveTabOrientation({ deviceType: 'mobile', setting: 'vertical' })).toBe('horizontal');
+    for (const setting of ['vertical', 'horizontal', 'sideways', undefined]) {
+      expect(policy.resolveTabOrientation({ deviceType: 'desktop', setting }), `desktop/${setting}`).toBe('vertical');
+      expect(policy.resolveTabOrientation({ deviceType: 'tablet', setting }), `tablet/${setting}`).toBe('vertical');
+      expect(policy.resolveTabOrientation({ deviceType: 'mobile', setting }), `mobile/${setting}`).toBe('horizontal');
+    }
   });
 
-  it('fails closed to horizontal for absent and unknown values', () => {
+  it('fails closed to horizontal when the device class is unknown', () => {
     const policy = loadPolicy();
     expect(policy.resolveTabOrientation(undefined)).toBe('horizontal');
     expect(policy.resolveTabOrientation({})).toBe('horizontal');
-    expect(policy.resolveTabOrientation({ deviceType: 'desktop', setting: 'sideways' })).toBe('horizontal');
   });
 });
 
 describe('vertical tab rail wiring', () => {
-  it('ships one rail before the terminal and one orientation control', () => {
+  it('ships one rail before the terminal and no orientation setting (the arrow is the only control)', () => {
     expect(indexHtml).toContain('id="tabRail"');
     expect(indexHtml.indexOf('id="tabRail"')).toBeLessThan(indexHtml.indexOf('id="terminalContainer"'));
-    expect(indexHtml).toContain('id="appSettingsTabOrientation"');
-    expect(indexHtml).toContain('<option value="horizontal">');
-    expect(indexHtml).toContain('<option value="vertical">');
+    expect(indexHtml).not.toContain('appSettingsTabOrientation');
+    expect(indexHtml).toContain('id="tabRailToggle"');
+    expect(settingsJs).not.toContain('appSettingsTabOrientation');
   });
 
   it('moves the existing list between the rail and its header host', () => {
     expect(settingsJs).toMatch(/applyTabOrientation\(options = \{\}\)/);
-    expect(settingsJs).toContain('rail.appendChild(tabsEl)');
+    expect(settingsJs).toContain("rail.insertBefore(tabsEl, rail.querySelector('.tab-rail-foot'))");
     expect(settingsJs).toContain('headerHost.appendChild(tabsEl)');
     expect(settingsJs).toContain("tabsEl.setAttribute('aria-orientation'");
   });
@@ -62,9 +63,8 @@ describe('vertical tab rail wiring', () => {
     expect(block.indexOf('resolveTabOrientation')).toBeLessThan(block.indexOf('shouldAutoWrapTabs'));
   });
 
-  it('round-trips a device-scoped strict setting and has vertical styles', () => {
+  it('keeps the legacy device-scoped key valid for stored blobs and has vertical styles', () => {
     expect(settingsJs).toMatch(/tabOrientation:\s*'horizontal'/);
-    expect(settingsJs).toMatch(/tabOrientation:\s*document\.getElementById\('appSettingsTabOrientation'\)\.value/);
     const displayKeys = settingsJs.slice(settingsJs.indexOf('const displayKeys = new Set(['));
     expect(displayKeys.slice(0, 1800)).toContain("'tabOrientation'");
     expect(schemasTs).toMatch(/tabOrientation:\s*z\.enum\(\['horizontal',\s*'vertical'\]\)\.optional\(\)/);

@@ -23,12 +23,43 @@
  * @module config/cases-dir
  */
 
+import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
+import { dataPath } from './instance.js';
+
+/** Read the saved default case location (settings.json `caseBaseDir`); null when unset or unusable. */
+export function readConfiguredCasesDir(): string | null {
+  try {
+    const value = (JSON.parse(readFileSync(dataPath('settings.json'), 'utf-8')) as { caseBaseDir?: unknown })
+      .caseBaseDir;
+    return typeof value === 'string' && isAbsolute(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The saved location AS IT WAS WHEN THE PROCESS STARTED (Switchboard T6). It is read once, on
+ * first use, and never again: changing the default case location takes effect after a restart,
+ * because Docker cases need the host bind mount at the same absolute path and running tmux
+ * sessions keep their cwd. `undefined` = not read yet.
+ */
+let startupCasesDir: string | null | undefined;
+function savedCasesDirAtStartup(): string | null {
+  if (startupCasesDir === undefined) startupCasesDir = readConfiguredCasesDir();
+  return startupCasesDir;
+}
+
+/** Where the active cases directory comes from: the env var wins, then the saved setting, then the default. */
+export function getCasesDirSource(): 'env' | 'setting' | 'default' {
+  if (process.env.CODEMAN_CASES_PATH) return 'env';
+  return savedCasesDirAtStartup() ? 'setting' : 'default';
+}
 
 /** Absolute path to the shared cases directory. */
 export function getCasesDir(): string {
-  return process.env.CODEMAN_CASES_PATH || join(homedir(), 'codeman-cases');
+  return process.env.CODEMAN_CASES_PATH || savedCasesDirAtStartup() || join(homedir(), 'codeman-cases');
 }
 
 /** Absolute path to one case folder inside it. */

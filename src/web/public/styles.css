@@ -1,5 +1,113 @@
 /* Codeman - Terminal-First UI */
 
+/* ===== Design tokens (Switchboard T1) =====
+   New UI reads ONLY these. Existing rules keep their own variables and move over
+   as their screen is touched.
+
+   Terminal is the extreme of lightness: darkest on dark skins, lightest on light
+   skins. Chrome sits between terminal and text, so the eye lands on the output.
+
+   Two names the design calls --border and --accent already exist in this file
+   (defined below at :root and again by every skin, used ~190 times each), so a
+   second definition up here would be dead. The new tokens are --border-base and
+   --accent-base instead. --font-mono is reused as is (already JetBrains Mono).
+
+   Contrast was computed with the WCAG 2.x relative-luminance formula per surface;
+   recompute for every surface pair if a value changes. */
+:root {
+  --surface-terminal: #0C0D10;
+  --surface-base:     #101114;
+  --surface-chrome:   #17191E;
+  --surface-raised:   #1E2127;
+  --surface-panel-hd: #14161A;
+  --surface-hover:    #21242B;
+  --surface-active:   #262A32;
+
+  --border-base:   #23262D;
+  --border-mid:    #292D35;
+  --border-strong: #363B45;
+  --border-tree:   #3A3F49;
+
+  --text-1: #E6E8EC;
+  --text-2: #A3AAB6;
+  --text-3: #8B929E; /* floor for any text that carries information */
+  --text-4: #5C636E; /* disabled controls only */
+
+  --accent-base: #7B8CFF;
+  --accent-text: #9AA7FF;
+  --accent-bg:   rgba(123, 140, 255, 0.13);
+  --accent-ring: rgba(123, 140, 255, 0.32);
+
+  /* Status colors are reserved: never a data series, never decoration. */
+  --status-run:     #4ADE80;
+  --status-run-text: #4ADE80; /* text on the selected/tinted rail rows: --status-run itself fails 4.5:1 there on light */
+  --status-wait:    #FBBF24;
+  --status-blocked: #F87171;
+  --status-idle:    #6B7280;
+  --tint-blocked: rgba(248, 113, 113, 0.08);
+  --tint-wait:    rgba(251, 191, 36, 0.06);
+  --text-warn:    #C9A961;
+
+  --shadow-pop: 0 16px 40px rgba(0, 0, 0, 0.55);
+  --backdrop:   rgba(8, 9, 11, 0.66);
+
+  --data-bar:   #8FA0FF;
+  --data-money: #2DD4BF;
+  --data-track: #1E2127;
+
+  --font-ui: 'IBM Plex Sans', 'IBM Plex Sans KR', system-ui, sans-serif;
+}
+
+/* Light base. Each light skin below still overrides what is its own. */
+html:is([data-skin="paper-gray"], [data-skin="solarized-light"], [data-skin="catppuccin-latte"], [data-skin="rose-pine-dawn"]) {
+  --surface-terminal: #FFFFFF;
+  --surface-base:     #F6F7F9;
+  --surface-chrome:   #EEF0F3;
+  --surface-raised:   #FFFFFF;
+  --surface-panel-hd: #E9ECF0;
+  --surface-hover:    #E4E7EC;
+  --surface-active:   #DCE0E6;
+
+  --border-base:   #DDE1E6;
+  --border-mid:    #D2D7DE;
+  --border-strong: #BFC5CE;
+  --border-tree:   #AEB5BF;
+
+  --text-1: #1A1D23;
+  --text-2: #454C57;
+  --text-3: #5A616C;
+  --text-4: #8A919C;
+
+  --accent-base: #4255D6;
+  --accent-text: #3445C0;
+  --accent-bg:   rgba(66, 85, 214, 0.10);
+  --accent-ring: rgba(66, 85, 214, 0.35);
+
+  --status-run:     #15803D;
+  --status-run-text: #166534;
+  --status-wait:    #A15C07;
+  --status-blocked: #C81E1E;
+  --status-idle:    #737A86;
+  --tint-blocked:   rgba(200, 30, 30, 0.07);
+  --tint-wait:      rgba(161, 92, 7, 0.08);
+  --text-warn:      #7A4F06;
+
+  --shadow-pop: 0 16px 40px rgba(16, 24, 40, 0.16);
+  --backdrop:   rgba(16, 24, 40, 0.32);
+
+  --data-bar:   #5B6CE6;
+  --data-money: #0F766E;
+  --data-track: #E3E6EB;
+}
+
+/* The terminal surface must equal xterm's background, or the padding shows a band.
+   Every skin already carries that value as --term-bg (test/theme-tokens.test.ts
+   pins term-bg === the skin's xterm background), so follow it. */
+html[data-skin] {
+  --surface-terminal: var(--term-bg);
+}
+
+
 /* Self-hosted UI + mono fonts (Carbon Aurora · Daylight) — served from /fonts,
    no external CDN, CSP-safe (font-src 'self'). Variable woff2 cover all weights. */
 @font-face {
@@ -143,7 +251,7 @@ html[data-skin="daylight-blue"] {
   --border: #2b333f; --border-light: #3a4350;
   --text: #f3f6fa; --text-dim: #98a2b1; --text-muted: #717b8c;
   --accent: #38b6f0; --accent-hover: #3ec8ee;
-  --term-bg: #161b23;
+  --term-bg: #0c0d10; /* = --surface-terminal (darkest surface), see the token block at the top */
   --green: #44b993; --yellow: #f0c25a; --red: #e06363;
   --glass-bg: rgba(31, 38, 48, 0.85); --glass-border: rgba(255, 255, 255, 0.08);
   --accent-d: #2487c9; --emerald: #3ec8ee; --teal: #2b8fd9;
@@ -212,7 +320,7 @@ html[data-skin="paper-gray"] {
   --border: #d0d7de; --border-light: #afb8c1;
   --text: #1f2328; --text-dim: #59636e; --text-muted: #6e7781;
   --accent: #0969da; --accent-hover: #0550ae;
-  --term-bg: #f6f8fa;
+  --term-bg: #ffffff; /* = --surface-terminal (lightest surface), see the token block at the top */
   --green: #1a7f37; --yellow: #9a6700; --red: #cf222e;
   --glass-bg: rgba(255, 255, 255, 0.9); --glass-border: rgba(31, 35, 40, 0.15);
   --control-bg: rgba(31, 35, 40, 0.045); --control-bg-hover: rgba(31, 35, 40, 0.08);
@@ -2336,24 +2444,6 @@ html[data-tab-orientation='vertical'] .tab-rail .session-tab .tab-name-prefix {
 
 .btn-icon-header.btn-sm:hover {
   transform: none;
-}
-
-.header-font-controls {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.15rem 0.4rem;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  border-radius: var(--btn-radius);
-}
-
-.header-font-controls .font-size-display {
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  min-width: 18px;
-  text-align: center;
-  font-family: 'SF Mono', Monaco, monospace;
 }
 
 /* Session tab gear icon */
@@ -18964,38 +19054,15 @@ html[data-session-list="sidebar"][data-sidebar="collapsed"] .btn-sidebar-toggle 
   }
 }
 
-/* Split-Pane Sessions: container inserted only while a split is active.
-   .terminal-wrap (Pane A) is reparented into this as the first child; it
-   keeps every existing rule unchanged since nothing here restyles it. */
+/* Split-Pane Sessions: the container (root of the split tree) is inserted only while a split is
+   active. Each pane is a `.split-leaf`; Pane A's wrapper holds the untouched .terminal-wrap.
+   Branches nest as `.split-node--row|col` (see the T5 block at the end of this file). */
 .terminal-split-container {
   display: flex;
   flex-direction: row;
   width: 100%;
   height: 100%;
   min-height: 0;
-}
-
-.terminal-split-container > .terminal-wrap {
-  /* flex-shrink 1 (not 0): the divider's own 6px is fixed-width, and Pane A
-     +Pane B's inline flex-basis (openSplitPane/onMove) always sums to 100%,
-     so with flex-shrink 0 on both panes the row is 100% + 6px wide and
-     .main's overflow clips Pane B's right edge by exactly the divider's
-     width. Shrinking lets the two panes give up that 6px between them. */
-  flex: 0 1 auto;
-  min-width: 240px;
-  overflow: hidden;
-}
-
-.split-divider {
-  flex: 0 0 6px;
-  cursor: col-resize;
-  background: var(--border-color, #333);
-  position: relative;
-}
-
-.split-divider:hover,
-.split-divider.dragging {
-  background: var(--accent-color, #4a9eff);
 }
 
 .terminal-pane-b {
@@ -19087,4 +19154,1573 @@ html[data-session-list="sidebar"][data-sidebar="collapsed"] .btn-sidebar-toggle 
   padding: 8px 10px;
   font-size: 13px;
   color: var(--text-muted);
+}
+
+/* ===== Theme controls (Switchboard T1) — tokens only ===== */
+.theme-controls { display: flex; flex-direction: column; gap: 16px; width: 100%; }
+.theme-fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.theme-fieldset[hidden] { display: none; }
+.theme-fieldset > legend {
+  padding: 0; margin-bottom: 8px;
+  font-size: 12px; font-weight: 600; color: var(--text-2);
+}
+.theme-seg {
+  display: inline-flex; padding: 3px; gap: 2px;
+  background: var(--surface-chrome);
+  border: 1px solid var(--border-mid);
+  border-radius: 9px;
+}
+.theme-seg button {
+  height: 28px; padding: 0 16px;
+  border: 0; border-radius: 6px;
+  background: transparent; color: var(--text-2);
+  font: inherit; font-size: 13px; cursor: pointer;
+}
+.theme-seg button:hover { background: var(--surface-hover); }
+.theme-seg button[aria-pressed="true"] {
+  background: var(--accent-bg); color: var(--accent-text);
+  box-shadow: inset 0 0 0 1px var(--accent-ring);
+}
+.theme-status { margin-left: 12px; font-size: 12px; color: var(--text-3); }
+.theme-cards { display: flex; flex-wrap: wrap; gap: 8px; }
+.theme-card {
+  width: 104px; padding: 6px;
+  display: flex; flex-direction: column; gap: 6px; align-items: stretch;
+  background: var(--surface-chrome);
+  border: 1px solid var(--border-mid); border-radius: 9px;
+  color: var(--text-2); font: inherit; font-size: 11px; text-align: left; cursor: pointer;
+}
+.theme-card:hover { background: var(--surface-hover); }
+.theme-card[aria-pressed="true"] {
+  background: var(--accent-bg); border-color: var(--accent-base); color: var(--text-1);
+}
+.theme-card:focus-visible, .theme-seg button:focus-visible {
+  outline: 2px solid var(--accent-base); outline-offset: 2px;
+}
+/* Swatch colors are set inline from the skin's OWN palette (never tokens). */
+.theme-swatch {
+  display: flex; flex-direction: column; gap: 3px; justify-content: center;
+  height: 38px; padding: 6px 8px; border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.35);
+}
+.theme-swatch i { display: block; height: 3px; border-radius: 2px; }
+.theme-swatch i:nth-child(1) { width: 70%; }
+.theme-swatch i:nth-child(2) { width: 45%; }
+.theme-swatch i:nth-child(3) { width: 58%; }
+.theme-card-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ===== UI fonts (Switchboard T1) =====
+   IBM Plex Sans has no Hangul, so IBM Plex Sans KR must follow it in --font-ui or Korean
+   falls through to system-ui and the two scripts come out in different faces.
+   Bundled, never a CDN: the app must work offline and behind a firewall.
+   Both files are SUBSETS of the original fonts (SIL OFL 1.1, see fonts/LICENSE-ibm-plex-OFL.txt):
+     latin      U+0020-007E, Latin-1, general punctuation, a few arrows/bullets
+     kr-ksx1001 the 2,350 KS X 1001 Hangul syllables, KS X 1001 symbols (「」 · ※ …) and the
+                compatibility jamo an IME shows while composing
+   A syllable outside that set falls back to system-ui. Only 400/500/600 are shipped. */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('fonts/ibm-plex-sans-latin-Regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('fonts/ibm-plex-sans-latin-Medium.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('fonts/ibm-plex-sans-latin-SemiBold.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'IBM Plex Sans KR';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('fonts/ibm-plex-sans-kr-ksx1001-Regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'IBM Plex Sans KR';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('fonts/ibm-plex-sans-kr-ksx1001-Medium.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'IBM Plex Sans KR';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('fonts/ibm-plex-sans-kr-ksx1001-SemiBold.woff2') format('woff2');
+}
+
+/* ===== Header menu bar (Switchboard T2) =====
+   Reads only design tokens. The dropdown hangs off <body> (fixed), not the header:
+   .header's `contain: paint` would clip it. 1000 = same layer as the split picker. */
+.header-menu {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: var(--header-height);
+  padding-right: 0.5rem;
+  margin-right: 0.25rem;
+  flex-shrink: 0;
+}
+
+.header-menu-btn {
+  height: 30px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.header-menu-btn:hover {
+  background: var(--surface-hover);
+}
+
+.header-menu-btn[aria-expanded='true'] {
+  background: var(--surface-active);
+  color: var(--text-1);
+}
+
+.header-menu-btn:focus-visible,
+.header-menu-item:focus-visible,
+.btn-header-palette:focus-visible {
+  outline: 2px solid var(--accent-base);
+  outline-offset: 1px;
+}
+
+.header-menu-list {
+  position: fixed;
+  z-index: 1000;
+  width: 268px;
+  padding: 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: 11px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-pop);
+}
+
+.header-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-1);
+  font: inherit;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.header-menu-item svg {
+  flex-shrink: 0;
+  color: var(--text-2);
+}
+
+.header-menu-item:hover:not(:disabled),
+.header-menu-item:focus-visible {
+  background: var(--surface-hover);
+}
+
+.header-menu-item:disabled {
+  color: var(--text-4);
+  cursor: default;
+}
+
+.header-menu-item:disabled svg {
+  color: var(--text-4);
+}
+
+/* Destructive entry: status color + a rule above it, never color alone. */
+.header-menu-item--danger,
+.header-menu-item--danger svg {
+  color: var(--status-blocked);
+}
+
+.header-menu-item--danger:disabled,
+.header-menu-item--danger:disabled svg {
+  color: var(--text-4);
+}
+
+.header-menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border-mid);
+}
+
+.btn-header-palette {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 8px 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.btn-header-palette[hidden] {
+  display: none;
+}
+
+.btn-header-palette:hover {
+  background: var(--surface-hover);
+}
+
+.btn-header-palette kbd {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-3);
+}
+
+/* Settings → Font: the A- / size / A+ stepper that replaced the header control. */
+.set-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.set-stepper-value {
+  min-width: 2ch;
+  text-align: center;
+  font-family: var(--font-mono);
+  color: var(--text-1);
+}
+
+#killAllModal .modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+/* ===== Session rail (Switchboard T3) =====
+   Design tokens only. The older detailed-rail rules above paint bordered cards at
+   specificity (0,5,1)-(0,6,1); every row rule here repeats that selector with `.tab-rail`
+   doubled, which adds exactly one class and wins without !important (except where the
+   rule it beats is itself !important: the selected row).
+   Search and "New session" exist only in a vertical, non-compact rail. */
+.tab-rail-search,
+.tab-rail-foot {
+  display: none;
+}
+
+html[data-tab-orientation='vertical']:not(.tab-rail-compact) .tab-rail .tab-rail-search {
+  display: block;
+  flex: 0 0 auto;
+  padding: 8px 8px 4px;
+}
+
+html[data-tab-orientation='vertical']:not(.tab-rail-compact) .tab-rail .tab-rail-foot {
+  display: block;
+  flex: 0 0 auto;
+  padding: 8px;
+  border-top: 1px solid var(--border-mid);
+}
+
+.tab-rail-filter {
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border-mid);
+  border-radius: 7px;
+  background: var(--surface-base);
+  color: var(--text-1);
+  font: inherit;
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+
+.tab-rail-filter::placeholder {
+  color: var(--text-3);
+}
+
+.tab-rail-filter:focus-visible,
+.tab-rail-new:focus-visible {
+  outline: 2px solid var(--accent-base);
+  outline-offset: 1px;
+}
+
+.tab-rail-new {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  height: 32px;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tab-rail-new:hover {
+  background: var(--surface-hover);
+  color: var(--text-1);
+}
+
+/* Group headers sit inside #sessionTabs; `order` is set inline from the sort. */
+.tab-group-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 10px 10px 4px;
+  color: var(--text-3);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tab-group-head[hidden] {
+  display: none;
+}
+
+.tab-group-head--attention {
+  color: var(--status-blocked);
+}
+
+.tab-group-count {
+  font-family: var(--font-mono);
+}
+
+html[data-tab-orientation='vertical'][data-tab-rail-detail='rich']:not(.tab-rail-compact) .tab-rail.tab-rail .session-tabs {
+  gap: 2px;
+  padding-top: 0;
+}
+
+html[data-tab-orientation='vertical'][data-tab-rail-detail='rich']:not(.tab-rail-compact) .tab-rail.tab-rail .session-tab {
+  position: relative;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px 8px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  box-shadow: none;
+  animation: none;
+}
+
+html[data-tab-orientation='vertical'][data-tab-rail-detail='rich']:not(.tab-rail-compact) .tab-rail.tab-rail .session-tab:hover {
+  background: var(--surface-hover);
+}
+
+/* The selected row: both properties are !important on the base `.session-tab.active`. */
+html[data-tab-orientation='vertical'][data-tab-rail-detail='rich']:not(.tab-rail-compact) .tab-rail.tab-rail .session-tab.active {
+  background: var(--accent-bg) !important;
+  border: 0 !important;
+  box-shadow: inset 0 0 0 1px var(--accent-ring) !important;
+}
+
+html[data-tab-orientation='vertical'][data-tab-rail-detail='rich']:not(.tab-rail-compact) .tab-rail.tab-rail .session-tab.tab-state-needs,
+html[data-tab-orientation='vertical'][data-tab-rail-detail='rich']:not(.tab-rail-compact) .tab-rail.tab-rail .session-tab.tab-state-error {
+  background: var(--tint-blocked);
+}
+
+html[data-tab-orientation='vertical'][data-tab-rail-detail='rich']:not(.tab-rail-compact) .tab-rail.tab-rail .session-tab.tab-state-waiting {
+  background: var(--tint-wait);
+}
+
+/* State stripe. A real element (not ::before): the alert rules already draw a ring on ::before. */
+html[data-tab-orientation='vertical'][data-tab-rail-detail='rich']:not(.tab-rail-compact) .tab-rail.tab-rail .session-tab .tab-stripe {
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--status-idle);
+}
+
+html[data-tab-orientation='vertical'][data-tab-rail-detail='rich']:not(.tab-rail-compact) .tab-rail.tab-rail .session-tab.tab-state-needs .tab-stripe,
+html[data-tab-orientation='vertical'][data-tab-rail-detail='rich']:not(.tab-rail-compact) .tab-rail.tab-rail .session-tab.tab-state-error .tab-stripe {
+  background: var(--status-blocked);
+}
+
+html[data-tab-orientation='vertical'][data-tab-rail-detail='rich']:not(.tab-rail-compact) .tab-rail.tab-rail .session-tab.tab-state-waiting .tab-stripe {
+  background: var(--status-wait);
+}
+
+html[data-tab-orientation='vertical'][data-tab-rail-detail='rich']:not(.tab-rail-compact) .tab-rail.tab-rail .session-tab.tab-state-working .tab-stripe {
+  background: var(--status-run);
+}
+
+/* The stripe replaces the dot; the state is also spelled out by .tab-state-label. */
+html[data-tab-orientation='vertical'][data-tab-rail-detail='rich']:not(.tab-rail-compact) .tab-rail.tab-rail .session-tab .tab-status {
+  display: none;
+}
+
+html[data-tab-orientation='vertical'][data-tab-rail-detail='rich']:not(.tab-rail-compact) .tab-rail.tab-rail .session-tab .tab-name {
+  color: var(--text-1);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+}
+
+html[data-tab-orientation='vertical'][data-tab-rail-detail='rich']:not(.tab-rail-compact) .tab-rail.tab-rail .session-tab .tab-name-row {
+  min-width: 0;
+}
+
+html[data-tab-orientation='vertical'][data-tab-rail-detail='rich']:not(.tab-rail-compact) .tab-rail.tab-rail .session-tab .tab-folder {
+  display: none;
+}
+
+.tab-state-label {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+.tab-state-label--needs,
+.tab-state-label--error {
+  color: var(--status-blocked);
+}
+
+.tab-state-label--waiting {
+  color: var(--text-warn);
+}
+
+.tab-state-label--working {
+  color: var(--status-run-text);
+}
+
+.tab-state-label--watching {
+  margin-left: 4px;
+  color: var(--accent-text);
+}
+
+/* The hover actions take the label's place on the right instead of crowding it. */
+html[data-tab-orientation='vertical'][data-tab-rail-detail='rich']:not(.tab-rail-compact) .tab-rail.tab-rail .session-tab:hover .tab-state-label {
+  display: none;
+}
+
+.tab-sub,
+.tab-path {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.45;
+  color: var(--text-3);
+}
+
+.tab-sub {
+  margin-top: 2px;
+}
+
+.tab-sub-key {
+  margin-right: 0.35em;
+}
+
+/* --text-3 on a tint or the selected row's accent wash measured 4.1-4.5:1 (floor is 4.5), so those rows step up to --text-2. */
+html[data-tab-orientation='vertical'][data-tab-rail-detail='rich']:not(.tab-rail-compact) .tab-rail.tab-rail .session-tab.active .tab-sub,
+html[data-tab-orientation='vertical'][data-tab-rail-detail='rich']:not(.tab-rail-compact) .tab-rail.tab-rail .session-tab.active .tab-path,
+html[data-tab-orientation='vertical'][data-tab-rail-detail='rich']:not(.tab-rail-compact) .tab-rail.tab-rail .session-tab.tab-state-needs .tab-sub,
+html[data-tab-orientation='vertical'][data-tab-rail-detail='rich']:not(.tab-rail-compact) .tab-rail.tab-rail .session-tab.tab-state-needs .tab-path,
+html[data-tab-orientation='vertical'][data-tab-rail-detail='rich']:not(.tab-rail-compact) .tab-rail.tab-rail .session-tab.tab-state-error .tab-sub,
+html[data-tab-orientation='vertical'][data-tab-rail-detail='rich']:not(.tab-rail-compact) .tab-rail.tab-rail .session-tab.tab-state-error .tab-path,
+html[data-tab-orientation='vertical'][data-tab-rail-detail='rich']:not(.tab-rail-compact) .tab-rail.tab-rail .session-tab.tab-state-waiting .tab-sub,
+html[data-tab-orientation='vertical'][data-tab-rail-detail='rich']:not(.tab-rail-compact) .tab-rail.tab-rail .session-tab.tab-state-waiting .tab-path {
+  color: var(--text-2);
+}
+
+.tab-panel-badge {
+  flex-shrink: 0;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  border: 1px solid var(--accent-ring);
+  border-radius: 4px;
+  background: var(--accent-bg);
+  color: var(--accent-text);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 14px;
+  text-align: center;
+}
+
+/* ===== Session rail collapse (Switchboard) =====
+   The rail itself is always on in a desktop/tablet window; this arrow is the only control.
+   Collapsed = rail width 0 with the arrow alone on the window's left edge, no icon strip.
+   `visibility: hidden` takes the hidden rail out of the tab order and the accessibility tree. */
+.tab-rail-toggle {
+  display: none;
+}
+
+html[data-tab-orientation='vertical'] .tab-rail-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  top: 50%;
+  left: calc(var(--tab-rail-width, 256px) - 11px);
+  z-index: 12;
+  width: 22px;
+  height: 40px;
+  margin-top: -20px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 11px;
+  background: var(--surface-raised);
+  color: var(--text-2);
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+html[data-tab-orientation='vertical'] .tab-rail-toggle:hover,
+html[data-tab-orientation='vertical'] .tab-rail-toggle:focus-visible {
+  background: var(--surface-hover);
+  color: var(--text-1);
+  opacity: 1;
+}
+
+html[data-tab-orientation='vertical'] .tab-rail-toggle:focus-visible {
+  outline: 2px solid var(--accent-base);
+  outline-offset: 1px;
+}
+
+html[data-tab-orientation='vertical'][data-tab-rail='collapsed'] .tab-rail {
+  flex-basis: 0;
+  width: 0;
+  border-right: 0;
+  visibility: hidden;
+}
+
+html[data-tab-orientation='vertical'][data-tab-rail='collapsed'] .tab-rail-toggle {
+  left: 0;
+  border-left: 0;
+  border-radius: 0 11px 11px 0;
+  opacity: 1;
+}
+
+html[data-tab-orientation='vertical'][data-tab-rail='collapsed'] .tab-rail-toggle svg {
+  transform: rotate(180deg);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Home tab + usage dashboard (Switchboard T4)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* The pinned row: first on the rail (the sorted rail paints with flex `order`, headers start at 0). */
+.session-tab--home {
+  order: -1;
+  color: var(--text-2);
+}
+.session-tab--home.active { color: var(--text-1); }
+.session-tab--home .tab-home-icon,
+.session-tab--home .tab-home-pin {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.session-tab--home .tab-home-pin { margin-left: auto; color: var(--text-3); }
+.session-tab--home.active .tab-home-icon { color: var(--accent-text); }
+
+.home-layer {
+  display: none;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--surface-base);
+  color: var(--text-1);
+  font-family: var(--font-ui);
+}
+.main.home-active .home-layer { display: block; }
+.main.home-active .terminal-wrap,
+.main.home-active .terminal-split-container,
+.main.home-active .webview-layer,
+.main.home-active .welcome-overlay { display: none !important; }
+
+.home-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px;
+  max-width: 1120px;
+  margin: 0 auto;
+}
+.home-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.home-head h2 { margin: 0; font-size: 19px; font-weight: 600; color: var(--text-1); }
+.home-stamp { font-size: 12px; color: var(--text-3); }
+
+.home-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.home-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-base);
+  min-width: 0;
+}
+.home-tile-label { font-size: 12px; color: var(--text-2); }
+.home-tile-val {
+  font-family: var(--font-mono);
+  font-size: 27px;
+  font-weight: 500;
+  letter-spacing: -0.8px;
+  line-height: 1.1;
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+}
+.home-tile-val--money { color: var(--data-money); }
+.home-tile-sub { font-size: 12px; color: var(--text-2); }
+.home-tile-sub--warn { color: var(--status-blocked); }
+.home-tile-sub--warn::before { content: '● '; }
+
+.home-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.home-col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.home-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-base);
+  min-width: 0;
+}
+.home-card h3 { margin: 0; font-size: 13px; font-weight: 600; color: var(--text-1); display: flex; gap: 8px; align-items: baseline; }
+.home-card h3 small { font-size: 11px; font-weight: 400; color: var(--text-3); }
+.home-card h4 { margin: 4px 0 0; font-size: 11px; font-weight: 600; color: var(--text-2); letter-spacing: 0.04em; text-transform: uppercase; }
+
+.home-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.home-model { display: flex; flex-direction: column; gap: 5px; font-size: 13px; }
+.home-model-top { display: flex; justify-content: space-between; gap: 8px; color: var(--text-1); }
+.home-tokens { font-family: var(--font-mono); font-size: 10px; color: var(--text-3); }
+
+/* One series colour, direct labels, no legend, no grid lines. */
+.home-bar-track { display: block; height: 8px; border-radius: 4px; background: var(--data-track); overflow: hidden; flex: 1; min-width: 0; }
+.home-bar-fill { display: block; height: 100%; border-radius: 4px; background: var(--data-bar); }
+.home-bar-row { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+.home-bar-row--fixed .home-bar-name { flex: 0 0 108px; }
+.home-bar-name { flex: 0 1 45%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-1); }
+.home-bar-val { flex: 0 0 48px; text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--text-1); }
+
+.home-limits { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.home-limit { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.home-limit-val { font-family: var(--font-mono); font-size: 30px; font-weight: 500; letter-spacing: -0.8px; line-height: 1.1; color: var(--text-1); font-variant-numeric: tabular-nums; }
+.home-limit-val small { font-size: 14px; color: var(--text-2); margin-left: 2px; }
+.home-gauge { display: block; height: 8px; border-radius: 4px; background: var(--data-track); overflow: hidden; }
+.home-gauge > span { display: block; height: 100%; border-radius: 4px; background: var(--data-bar); }
+.home-gauge--warn > span { background: var(--status-wait); }
+.home-gauge--danger > span { background: var(--status-blocked); }
+.home-limit-state { font-size: 12px; font-weight: 600; color: var(--text-1); }
+.home-limit-state--warn { color: var(--text-warn); }
+.home-limit-state--danger { color: var(--status-blocked); }
+
+.home-foot { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--border-base); font-size: 12px; color: var(--text-2); }
+.home-foot b { color: var(--text-1); font-weight: 500; margin-left: 4px; }
+
+.home-none { margin: 0; font-size: 12px; color: var(--text-3); }
+.home-notes { margin: 0; font-size: 11px; line-height: 1.5; color: var(--text-3); }
+.home-empty { display: flex; flex-direction: column; gap: 6px; align-items: center; padding: 64px 16px; margin: 0; color: var(--text-2); text-align: center; }
+.home-empty strong { font-size: 15px; color: var(--text-1); }
+
+@media (max-width: 900px) {
+  .home-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .home-cols { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ===== Split panes (Switchboard T5) — tokens only =====
+   A split is a tree of `.split-node` branches (row = side by side, col = stacked) whose leaves
+   are `.split-leaf` panes, separated by 5px `.split-divider`s. Pane A's leaf wraps the
+   unchanged .terminal-wrap; B, C and D are `.terminal-pane-b.split-leaf`. A child's flex-basis
+   is its share in percent, set inline; flex-shrink gives the divider's own 5px back. */
+.terminal-split-container.split-node--col {
+  flex-direction: column;
+}
+
+.split-node {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+}
+
+.split-node--row {
+  flex-direction: row;
+}
+
+.split-node--col {
+  flex-direction: column;
+}
+
+.split-leaf {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 auto;
+  min-width: 240px;
+  min-height: 120px;
+  overflow: hidden;
+  background: var(--surface-terminal);
+}
+
+.split-leaf--primary > .terminal-wrap {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* The focused pane: an inset ring on an overlay, never a border, so nothing in the layout moves. */
+.split-leaf--focused::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px var(--accent-ring);
+}
+
+.split-pane-header.terminal-pane-b-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex: 0 0 34px;
+  gap: 9px;
+  box-sizing: border-box;
+  height: 34px;
+  min-width: 0;
+  padding: 0 12px;
+  background: var(--surface-panel-hd);
+  border-bottom: 1px solid var(--border-base);
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+
+.split-pane-letter {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--border-base);
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.split-leaf--focused .split-pane-letter {
+  background: var(--accent-bg);
+  color: var(--accent-text);
+}
+
+.split-pane-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-2);
+}
+
+.split-leaf--focused .split-pane-name {
+  color: var(--text-1);
+  font-weight: 500;
+}
+
+.split-pane-dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--status-idle);
+}
+
+.split-pane-dot--working {
+  background: var(--status-run);
+}
+
+.split-pane-dot--waiting {
+  background: var(--status-wait);
+}
+
+.split-pane-dot--needs,
+.split-pane-dot--error {
+  background: var(--status-blocked);
+}
+
+.split-pane-project {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 1 auto;
+  gap: 4px;
+  min-width: 0;
+  height: 22px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-3);
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.split-pane-project:hover {
+  background: var(--surface-hover);
+  color: var(--text-1);
+}
+
+.split-pane-project:focus-visible,
+.split-pane-header .terminal-pane-b-close:focus-visible,
+.split-divider:focus-visible,
+.split-empty:focus-visible {
+  outline: 2px solid var(--accent-base);
+  outline-offset: -2px;
+}
+
+.split-pane-project-name {
+  max-width: 16ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.split-pane-spacer {
+  flex: 1 1 auto;
+}
+
+.split-pane-cost {
+  flex: 0 0 auto;
+  color: var(--data-money);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.split-pane-header .terminal-pane-b-close {
+  flex: 0 0 auto;
+  color: var(--text-3);
+  font-size: 16px;
+  line-height: 1;
+  opacity: 1;
+}
+
+.split-pane-header .terminal-pane-b-close:hover {
+  color: var(--text-1);
+}
+
+.split-empty {
+  margin: auto;
+  padding: 8px 14px;
+  border: 1px dashed var(--border-tree);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.split-empty:hover {
+  background: var(--surface-hover);
+  color: var(--text-1);
+}
+
+.split-divider {
+  position: relative;
+  flex: 0 0 5px;
+  background: var(--surface-chrome);
+  touch-action: none;
+}
+
+.split-divider--row {
+  cursor: col-resize;
+}
+
+.split-divider--col {
+  cursor: row-resize;
+}
+
+.split-divider::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 2px;
+  background: var(--border-tree);
+}
+
+.split-divider--row::after {
+  width: 2px;
+  height: 26px;
+}
+
+.split-divider--col::after {
+  width: 26px;
+  height: 2px;
+}
+
+.split-divider:hover::after,
+.split-divider.dragging::after,
+.split-divider:focus-visible::after {
+  background: var(--accent-base);
+}
+
+body.split-pane-resizing.split-pane-resizing--col,
+body.split-pane-resizing.split-pane-resizing--col * {
+  cursor: row-resize !important;
+}
+
+/* The two split buttons share the rail's foot with "New session". Desktop widths only,
+   same gate as the split itself (SPLIT_PANE_MIN_WIDTH). */
+html[data-tab-orientation='vertical']:not(.tab-rail-compact) .tab-rail .tab-rail-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tab-rail-foot .tab-rail-new {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+
+.tab-rail-split-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.tab-rail-split-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text-1);
+}
+
+.tab-rail-split-btn.is-current {
+  border-color: var(--accent-ring);
+  background: var(--accent-bg);
+  color: var(--accent-text);
+}
+
+.tab-rail-split-btn[aria-disabled='true'] {
+  color: var(--text-4);
+  cursor: not-allowed;
+}
+
+.tab-rail-split-btn:focus-visible {
+  outline: 2px solid var(--accent-base);
+  outline-offset: 1px;
+}
+
+@media (max-width: 1179px) {
+  .tab-rail-split-btn {
+    display: none;
+  }
+}
+
+/* T3 residual: drop a dragged session on the work area to split it. */
+.split-drop-overlay {
+  position: fixed;
+  z-index: 60;
+  display: none;
+  box-sizing: border-box;
+  border: 2px solid var(--accent-ring);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.split-drop-overlay.is-on {
+  display: block;
+}
+
+.split-drop-preview {
+  position: absolute;
+  background: var(--accent-bg);
+  border: 1px dashed var(--accent-ring);
+  box-sizing: border-box;
+}
+
+.split-drop-label {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 90%;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: var(--surface-chrome);
+  border: 1px solid var(--border-base);
+  color: var(--text-1);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.split-drop-overlay.is-refused {
+  border-color: var(--status-blocked);
+}
+
+.split-drop-overlay.is-refused .split-drop-preview {
+  display: none;
+}
+
+@media (max-width: 1179px) {
+  .split-drop-overlay {
+    display: none !important;
+  }
+}
+
+/* ── Native folder dialog support (Switchboard T7, native-folder.js) ─────────────────────────────
+   The checking list and the rejection dialog. Tokens only; state is always spelled in words. */
+.folder-pick-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10020;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.45);
+}
+/* Fold gutter (foldable phones): restated here, AFTER the base padding, because it has the same
+   specificity and an earlier rule would lose (see the fold region near the path picker). */
+.folder-pick-modal {
+  padding-right: calc(16px + var(--fold-inline-end));
+  padding-bottom: calc(16px + var(--fold-block-end));
+}
+.folder-pick-box {
+  width: min(460px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  box-sizing: border-box;
+  padding: 20px;
+  border: 1px solid var(--border-base);
+  border-radius: 10px;
+  background: var(--surface-chrome);
+  color: var(--text-1);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+.folder-pick-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.folder-pick-lock {
+  flex: none;
+  margin-top: 3px;
+  color: var(--status-blocked);
+  display: inline-flex;
+}
+.folder-pick-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.folder-pick-body {
+  margin: 8px 0 0;
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.55;
+}
+/* The rejected selection: tint + 2px stripe + lock + words, never colour alone. */
+.folder-pick-path.is-rejected {
+  margin-top: 12px;
+  padding: 8px 10px;
+  border-left: 2px solid var(--status-blocked);
+  border-radius: 4px;
+  background: var(--tint-blocked);
+}
+.folder-pick-path code {
+  font: 12px/1.5 'JetBrains Mono', ui-monospace, monospace;
+  color: var(--text-1);
+  word-break: break-all;
+}
+.folder-pick-steps {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  font-size: 12.5px;
+}
+.folder-pick-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-2);
+}
+.folder-pick-step-mark {
+  width: 14px;
+  text-align: center;
+  flex: none;
+}
+.folder-pick-step-label {
+  flex: 1;
+}
+.folder-pick-step-state {
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+.folder-pick-step[data-state='done'] .folder-pick-step-mark {
+  color: var(--status-ok, var(--accent-text));
+}
+.folder-pick-step[data-state='failed'] {
+  color: var(--text-1);
+}
+.folder-pick-step[data-state='failed'] .folder-pick-step-mark,
+.folder-pick-step[data-state='failed'] .folder-pick-step-state {
+  color: var(--status-blocked);
+}
+.folder-pick-step[data-state='checking'] .folder-pick-step-mark {
+  color: var(--accent-ring);
+  animation: folder-pick-pulse 1.2s ease-in-out infinite;
+}
+@keyframes folder-pick-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .folder-pick-step[data-state='checking'] .folder-pick-step-mark {
+    animation: none;
+  }
+}
+.folder-pick-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+/* WSL path next to its Windows spelling, under the field that received it. */
+.folder-pair {
+  margin-top: 8px;
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-base);
+  border-radius: 6px;
+  background: var(--surface-panel-hd);
+}
+.folder-pair[hidden] {
+  display: none;
+}
+.folder-pair-row {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+.folder-pair-label {
+  flex: none;
+  width: 84px;
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+.folder-pair-path {
+  font: 12px/1.5 'JetBrains Mono', ui-monospace, monospace;
+  color: var(--text-1);
+  word-break: break-all;
+}
+.folder-pair-note {
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+
+/* ── Work folders (Switchboard T6, work-folders.js) ───────────────────────────────────────────────
+   Tokens only. Badge meaning is carried by the WORD plus a left edge, never by colour alone, and badge
+   text stays --text-2 (coloured text on a tint failed contrast on the light skins). */
+.wf-root {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 4px 0;
+}
+.wf-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.wf-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.wf-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+.wf-note-wait,
+.wf-note-blocked {
+  padding: 6px 10px;
+  border-left: 2px solid var(--status-wait);
+  background: var(--surface-raised);
+}
+.wf-note-blocked {
+  border-left-color: var(--status-blocked);
+}
+.wf-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border-base);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.wf-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--surface-chrome);
+}
+.wf-row + .wf-row {
+  border-top: 1px solid var(--border-base);
+}
+.wf-row-icon {
+  flex: none;
+  display: inline-flex;
+  color: var(--text-3);
+}
+.wf-row-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.wf-path {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-1);
+  overflow-wrap: anywhere;
+}
+.wf-name {
+  font-size: 13px;
+  color: var(--text-1);
+}
+.wf-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.wf-meta-text {
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+.wf-row-actions {
+  flex: none;
+  display: flex;
+  gap: 6px;
+}
+.wf-badge {
+  padding: 1px 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--text-2);
+}
+.wf-badge-default {
+  border-color: var(--accent-base);
+}
+.wf-badge-wait {
+  border-left: 3px solid var(--status-wait);
+}
+.wf-badge-blocked {
+  border-left: 3px solid var(--status-blocked);
+}
+.wf-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.wf-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.wf-foot-text {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.wf-dialog {
+  width: min(520px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.wf-dialog-row {
+  display: flex;
+  gap: 8px;
+}
+.wf-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface-base);
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.wf-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border-base);
+  border-radius: 6px;
+}
+.wf-choice legend {
+  padding: 0 4px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+@media (max-width: 600px) {
+  .wf-row {
+    flex-wrap: wrap;
+  }
+}
+
+/* ── Project switch (Switchboard T8, project-switch.js) ───────────────────────────────────────────
+   The panel header's session button and project chip, the 356px popover and the confirmation.
+   Tokens only; the recommended button is --accent-base with --surface-terminal text (spec). */
+.split-pane-session {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 1 auto;
+  gap: 4px;
+  min-width: 0;
+  height: 22px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.split-pane-session:hover {
+  background: var(--surface-hover);
+}
+.split-pane-session:focus-visible {
+  outline: 2px solid var(--accent-base);
+  outline-offset: -2px;
+}
+.split-pane-project svg {
+  flex: none;
+}
+.psw-pop {
+  position: fixed;
+  z-index: 1000;
+  box-sizing: border-box;
+  width: min(356px, calc(100vw - 16px));
+  max-height: calc(100vh - 24px);
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface-chrome);
+  color: var(--text-1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+}
+.psw-heading {
+  margin: 8px 2px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-3);
+}
+.psw-heading:first-child {
+  margin-top: 0;
+}
+.psw-current,
+.psw-path {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-1);
+  overflow-wrap: anywhere;
+}
+.psw-current {
+  padding: 6px 8px;
+  border: 1px solid var(--border-base);
+  border-radius: 6px;
+  background: var(--surface-base);
+}
+.psw-empty {
+  margin: 2px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.psw-recent {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.psw-recent:hover {
+  background: var(--surface-hover);
+}
+.psw-recent:focus-visible,
+.psw-browse:focus-visible {
+  outline: 2px solid var(--accent-base);
+  outline-offset: -2px;
+}
+.psw-recent-name {
+  font-size: 13px;
+  color: var(--text-1);
+}
+.psw-recent-when {
+  grid-column: 2;
+  grid-row: 1;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.psw-recent-parent {
+  grid-column: 1 / -1;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.psw-browse {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--accent-ring);
+  border-radius: 6px;
+  background: var(--accent-bg);
+  color: var(--text-1);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.psw-warn {
+  margin: 10px 0 0;
+  padding: 6px 8px;
+  border-left: 2px solid var(--status-wait);
+  background: var(--tint-wait);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+.psw-confirm {
+  width: min(520px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.psw-paths {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.psw-path-row {
+  display: grid;
+  grid-template-columns: 7em 1fr;
+  gap: 8px;
+  align-items: baseline;
+}
+.psw-path-label {
+  font-size: 11px;
+  color: var(--text-3);
+}
+.psw-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.psw-option {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.psw-option .btn {
+  align-self: flex-start;
+}
+/* !important: the skin block's .btn-toolbar rules outrank a plain class (see CLAUDE.md, skin overrides) */
+.psw-confirm .psw-primary,
+.psw-confirm .psw-primary:hover {
+  background: var(--accent-base) !important;
+  border-color: var(--accent-base) !important;
+  color: var(--surface-terminal) !important;
+}
+.psw-option-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-2);
 }

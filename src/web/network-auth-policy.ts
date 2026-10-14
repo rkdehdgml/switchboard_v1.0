@@ -1,4 +1,5 @@
 import { isIP } from 'node:net';
+import { isDesktopHostAllowed, isDesktopOriginAllowed } from './desktop-mode.js';
 
 const EXPLICIT_TRUE_VALUES = new Set(['1', 'true', 'yes', 'on']);
 
@@ -57,6 +58,12 @@ export interface HostPolicy {
   allowedHosts: string[];
   /** Hostname of the currently-active Codeman-managed tunnel, if any. */
   tunnelHost?: string | null;
+  /**
+   * Desktop mode (T9-1): when set, ONLY `127.0.0.1:<port>` / `localhost:<port>` pass as
+   * Host and Origin; every other branch below (IP literals, tunnel and docker aliases,
+   * CODEMAN_ALLOWED_HOSTS) is bypassed.
+   */
+  desktopPort?: number;
 }
 
 /**
@@ -83,7 +90,7 @@ export function parseAuthorityHostname(authority: string | undefined): string | 
 }
 
 /** Build a HostPolicy from the bind host, CODEMAN_ALLOWED_HOSTS, and an active tunnel URL. */
-export function buildHostPolicy(bindHost: string, tunnelUrl?: string | null): HostPolicy {
+export function buildHostPolicy(bindHost: string, tunnelUrl?: string | null, desktopPort?: number): HostPolicy {
   const allowedHosts = (process.env.CODEMAN_ALLOWED_HOSTS || '')
     .split(',')
     .map((s) => s.trim().toLowerCase())
@@ -96,7 +103,7 @@ export function buildHostPolicy(bindHost: string, tunnelUrl?: string | null): Ho
       tunnelHost = null;
     }
   }
-  return { bindHost, allowedHosts, tunnelHost };
+  return { bindHost, allowedHosts, tunnelHost, desktopPort };
 }
 
 function matchesHost(hostname: string, policy: HostPolicy): boolean {
@@ -129,6 +136,7 @@ function matchesHost(hostname: string, policy: HostPolicy): boolean {
  * which will not be in the allowlist.
  */
 export function isAllowedRequestHost(hostHeader: string | undefined, policy: HostPolicy): boolean {
+  if (policy.desktopPort !== undefined) return isDesktopHostAllowed(hostHeader, policy.desktopPort);
   const hostname = parseAuthorityHostname(hostHeader);
   if (!hostname) return false;
   return matchesHost(hostname, policy);
@@ -139,9 +147,16 @@ export function isAllowedRequestHost(hostHeader: string | undefined, policy: Hos
  * A MISSING Origin is allowed: non-browser clients (curl, Claude Code hooks) omit
  * it, while browsers always attach it on cross-origin state-changing/WS requests —
  * so a forged cross-site request is caught while local automation keeps working.
- * The opaque origin 'null' (sandboxed iframe, data: URL) is rejected.
+ * The opaque origin 'null' (sandboxed iframe, data: URL) is rejected. Desktop mode
+ * pins the exact origin and, with `requireOrigin` (WebSocket upgrades), refuses a
+ * missing one.
  */
-export function isAllowedRequestOrigin(originHeader: string | undefined, policy: HostPolicy): boolean {
+export function isAllowedRequestOrigin(
+  originHeader: string | undefined,
+  policy: HostPolicy,
+  requireOrigin = false
+): boolean {
+  if (policy.desktopPort !== undefined) return isDesktopOriginAllowed(originHeader, policy.desktopPort, requireOrigin);
   if (originHeader === undefined || originHeader === '') return true;
   if (originHeader === 'null') return false;
   try {

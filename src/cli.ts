@@ -27,6 +27,8 @@ import { isSupportedAttachmentExtension } from './attachment-registry.js';
 import { daemonStatus, startDaemon, stopDaemon, type WebLaunchOptions } from './daemon-control.js';
 import { installService, serviceStatus, uninstallService } from './service-installer.js';
 import { isLoopbackBindHost, isUnauthenticatedNetworkAcknowledged } from './web/network-auth-policy.js';
+import { isMultiUserMode } from './config/multiuser.js';
+import { configureDesktopMode, DESKTOP_BIND_HOST, readDesktopToken } from './web/desktop-mode.js';
 import { confirm, heading, isInteractive, kv, palette, rule, tint, withSpinner, type Tone } from './cli-style.js';
 import type { ToolResult } from './utils/dependency-checker.js';
 import type { ReportStyle } from './utils/dependency-report.js';
@@ -910,17 +912,43 @@ function warnIfUnauthenticatedNetwork(launch: WebLaunchOptions): void {
   console.log(palette.warn('  Set CODEMAN_PASSWORD, or bind 127.0.0.1 and front it with tailscale serve.'));
 }
 
+/** Why `web --desktop` cannot start with these options, or null when it can. */
+function desktopLaunchRefusal(
+  options: { daemon?: boolean; stop?: boolean; status?: boolean; https?: boolean; multiuser?: boolean },
+  host: string
+): string | null {
+  if (host !== DESKTOP_BIND_HOST) return `--desktop only binds ${DESKTOP_BIND_HOST} (got ${host})`;
+  if (options.daemon || options.stop || options.status) return '--desktop runs in the foreground only';
+  if (options.https) return '--desktop does not use HTTPS (loopback only)';
+  if (options.multiuser || isMultiUserMode()) return '--desktop cannot be combined with multi-user mode';
+  return null;
+}
+
 // Web interface command
 const webCmd = addWebLaunchOptions(program.command('web').description('Start the web interface'))
   .option('-d, --daemon', 'Run detached in the background; survives the shell, logs to <data dir>/web.log')
   .option('--stop', 'Stop a server started with --daemon')
-  .option('--status', 'Report whether a detached server is running');
+  .option('--status', 'Report whether a detached server is running')
+  .option(
+    '--desktop',
+    'Desktop shell mode: require a per-launch token (first stdin line, or CODEMAN_DESKTOP_TOKEN), bind 127.0.0.1 only, no tunnel'
+  );
 
 webCmd.action(async (options) => {
   // The flag is surfaced to the rest of the process via the env var so
   // isMultiUserMode() has a single source of truth (see config/multiuser.ts).
   if (options.multiuser) process.env.CODEMAN_MULTIUSER = '1';
   const launch = toWebLaunchOptions(options);
+
+  if (options.desktop) {
+    // The token cannot ride a detached relaunch (argv would carry it), and every
+    // network-exposure path is closed in this mode, so refuse the combinations early.
+    const refusal = desktopLaunchRefusal(options, launch.host);
+    if (refusal) {
+      console.error(palette.err(`✗ ${refusal}`));
+      process.exit(1);
+    }
+  }
 
   if (options.stop) {
     // stopDaemon waits for the process to actually exit (up to 15s).
@@ -970,6 +998,16 @@ webCmd.action(async (options) => {
     }
     console.error(palette.err(`\n✗ ${result.message ?? 'Failed to start'}`));
     process.exit(1);
+  }
+
+  if (options.desktop) {
+    try {
+      const token = await readDesktopToken(process.env, process.stdin);
+      configureDesktopMode({ token, port: launch.port });
+    } catch (err) {
+      console.error(palette.err(`✗ ${err instanceof Error ? err.message : 'Desktop token error'}`));
+      process.exit(1);
+    }
   }
 
   const { startWebServer } = await import('./web/server.js');

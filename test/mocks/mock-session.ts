@@ -302,6 +302,13 @@ export class MockSession extends EventEmitter {
   outputTokens: number = 0;
   totalCost: number = 0;
 
+  /** Mirrors Session.applyTelemetryCost (cost only, returns whether it changed). */
+  applyTelemetryCost(totalCost: number): boolean {
+    if (!Number.isFinite(totalCost) || totalCost < 0 || totalCost === this.totalCost) return false;
+    this.totalCost = totalCost;
+    return true;
+  }
+
   /** Terminal buffer byte length */
   get terminalBufferLength(): number {
     return this.terminalBuffer.length;

@@ -28,6 +28,7 @@ import {
   FORCE_KILL_MS,
 } from './config/tunnel-config.js';
 import { getErrorMessage } from './types.js';
+import { getDesktopMode } from './web/desktop-mode.js';
 
 // ========== Types ==========
 
@@ -119,6 +120,11 @@ export class TunnelManager extends EventEmitter {
    * Start the cloudflared tunnel process.
    */
   start(localPort: number, https: boolean): void {
+    // Desktop shell (T9-1): never publish the local server, whatever asked (settings, scripts).
+    if (getDesktopMode()) {
+      console.warn('[Tunnel] refused: desktop mode never exposes the server');
+      return;
+    }
     if (this.process) {
       return; // Already running
     }

@@ -121,3 +121,33 @@ describe('custom display name and browser localization', () => {
     expect(html).not.toContain('<title>小码<&助手:laptop</title>');
   });
 });
+
+describe('default UI language is Korean', () => {
+  it('an unset or unknown language resolves to Korean; an explicit English choice is kept', () => {
+    const api = makeDom().window.CodemanI18n;
+    expect(api.normalizeLanguage(undefined)).toBe('ko');
+    expect(api.normalizeLanguage('fr')).toBe('ko');
+    expect(api.normalizeLanguage('en')).toBe('en');
+    expect(api.normalizeLanguage('zh-CN')).toBe('zh-CN');
+  });
+
+  it('the pre-paint script falls back to Korean, and keeps a stored en / zh-CN', () => {
+    const script = /<script>try\{var m=window\.innerWidth[\s\S]*?<\/script>/
+      .exec(indexSource)![0]
+      .replace(/<\/?script>/g, '');
+    const run = (stored: string | null) => {
+      const dom = new JSDOM('<!doctype html><html lang="en"><body></body></html>', {
+        runScripts: 'outside-only',
+        url: 'http://localhost/',
+      });
+      if (stored !== null)
+        dom.window.localStorage.setItem('codeman-app-settings', JSON.stringify({ language: stored }));
+      dom.window.eval(script);
+      return (dom.window as unknown as { __codemanLanguage: string }).__codemanLanguage;
+    };
+    expect(run(null)).toBe('ko');
+    expect(run('ko')).toBe('ko');
+    expect(run('en')).toBe('en');
+    expect(run('zh-CN')).toBe('zh-CN');
+  });
+});

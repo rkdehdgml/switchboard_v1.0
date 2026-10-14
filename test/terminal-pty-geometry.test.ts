@@ -233,7 +233,8 @@ describe('exactly one function may change the terminal size', () => {
   // with their own PTYs (or none), and each owns its own sizing.
   it('no other call site fits the main terminal behind its back', () => {
     // `fit(` optionally called through `?.`, so `fitAddon?.fit?.()` counts too.
-    const MAIN_TERMINAL_FIT = /^(?!.*(?:_splitPane|entry\.fitAddon)).*fitAddon[?.]*\.fit(?:\?\.)?\(\)/;
+    // A split pane (`pane.fitAddon`, the loop variable over _splitTerminalPanes()) is its own xterm.
+    const MAIN_TERMINAL_FIT = /^(?!.*(?:_splitPane|pane\.fitAddon|entry\.fitAddon)).*fitAddon[?.]*\.fit(?:\?\.)?\(\)/;
     const offenders: string[] = [];
     for (const rel of [
       'src/web/public/terminal-ui.js',

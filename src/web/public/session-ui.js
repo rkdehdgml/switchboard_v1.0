@@ -137,7 +137,9 @@ function registryCliById(id) {
 }
 
 function isExternalCliRunMode(mode) {
-  return EXTERNAL_CLI_MODES.has(mode) || registryCliById(mode)?.kind === 'agent';
+  // Built-in modes (claude has its own path, runClaude) are never "external" via the registry clause:
+  // it is for CLIs a user ADDED. Without the guard a Claude session lost its Respawn and Ralph tabs.
+  return EXTERNAL_CLI_MODES.has(mode) || (!BUILT_IN_RUN_MODES.has(mode) && registryCliById(mode)?.kind === 'agent');
 }
 
 Object.assign(CodemanApp.prototype, {
@@ -3087,6 +3089,8 @@ Object.assign(CodemanApp.prototype, {
     document.getElementById('newCaseDescription').value = '';
     document.getElementById('linkCaseName').value = '';
     document.getElementById('linkCasePath').value = '';
+    const linkPair = document.getElementById('linkCasePathPair');
+    if (linkPair) linkPair.hidden = true;
     const remoteFields = [
       'remoteCaseName',
       'remoteCasePath',
@@ -3616,21 +3620,53 @@ Object.assign(CodemanApp.prototype, {
 
   openLinkCasePathPicker() {
     const pathInput = document.getElementById('linkCasePath');
+    // Desktop shell: Windows' own folder dialog, validated by the server (native-folder.js).
+    // A plain browser has no such dialog, so it keeps the HTML picker below.
+    if (window.CodemanFolderPicker?.isAvailable()) {
+      this._chooseLinkCaseFolderNatively(pathInput);
+      return;
+    }
     PathPicker.open({
       title: 'Select Existing Project Folder',
       initialPath: pathInput.value.trim(),
       directoriesOnly: true,
-      onSelect: (path) => {
-        pathInput.value = path;
-        const nameInput = document.getElementById('linkCaseName');
-        if (!nameInput.value.trim()) {
-          const folderName = path.split('/').filter(Boolean).pop() || '';
-          if (/^[\p{L}\p{N}_-]+$/u.test(folderName)) nameInput.value = folderName;
-        }
-        pathInput.focus();
-        pathInput.setSelectionRange(path.length, path.length);
-      },
+      onSelect: (path) => this._applyLinkCaseFolder(pathInput, path),
     });
+  },
+
+  async _chooseLinkCaseFolderNatively(pathInput) {
+    const pair = document.getElementById('linkCasePathPair');
+    const current = pathInput.value.trim();
+    const result = await window.CodemanFolderPicker.choose({
+      title: 'Select project folder',
+      defaultPath: current.startsWith('/') ? current : undefined,
+    });
+    if (result.status === 'ok') {
+      this._applyLinkCaseFolder(pathInput, result.wslPath);
+      window.CodemanFolderPicker.renderPathPair(pair, result);
+    } else if (result.status === 'error') {
+      this.showToast(result.message, 'error');
+    } else if (result.status === 'rejected' && result.action === 'workfolders') {
+      // The rejection dialog's shortcut: close Add Case, open Settings at Work folders.
+      this.closeCreateCaseModal?.();
+      this.openAppSettings();
+      this.switchSettingsTab('settings-workfolders');
+    }
+    // other rejections: nothing to change (the dialog already explained itself on screen)
+  },
+
+  _applyLinkCaseFolder(pathInput, path) {
+    pathInput.value = path;
+    const nameInput = document.getElementById('linkCaseName');
+    if (!nameInput.value.trim()) {
+      const folderName = path.split('/').filter(Boolean).pop() || '';
+      if (/^[\p{L}\p{N}_-]+$/u.test(folderName)) nameInput.value = folderName;
+    }
+    pathInput.focus();
+    pathInput.setSelectionRange(path.length, path.length);
+    // A hand-typed or picker path no longer matches the last native pair.
+    const pair = document.getElementById('linkCasePathPair');
+    if (pair && !pair.hidden && !pair.textContent.includes(path)) pair.hidden = true;
   },
 
   /** HOST workspace directory — the same picker Link Existing uses. */

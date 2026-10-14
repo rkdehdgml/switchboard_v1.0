@@ -213,9 +213,10 @@ function shouldAutoWrapTabs(input) {
   return scrollWidth > clientWidth + 1;
 }
 
+// Switchboard: the session rail is not a preference. Desktop and tablet always get it (the user
+// collapses it with the arrow instead); phones keep the header strip. `setting` is ignored.
 function resolveTabOrientation(input) {
-  if (!input || input.setting !== 'vertical') return 'horizontal';
-  if (input.deviceType === 'mobile') return 'horizontal';
+  if (!input || !input.deviceType || input.deviceType === 'mobile') return 'horizontal';
   return 'vertical';
 }
 
@@ -1608,10 +1609,11 @@ function clampDividerPercent(rawPercent, min = 20, max = 80) {
   return rawPercent;
 }
 
+// `excludeId` is one id or a Set of ids (every session already shown in a pane).
 function buildSplitPickerSessions(sessions, sessionOrder, excludeId, detachedIds) {
   const result = [];
   for (const id of sessionOrder) {
-    if (id === excludeId) continue;
+    if (excludeId instanceof Set ? excludeId.has(id) : id === excludeId) continue;
     // A detached (popped-out) session's own window already yields its PTY
     // size (see sendResize's detachedElsewhere guard in terminal-ui.js) —
     // Pane B's SplitTerminalPane._sendResize() has no such check, so letting
@@ -1631,6 +1633,152 @@ function buildSplitPickerSessions(sessions, sessionOrder, excludeId, detachedIds
     result.push({ id, label: session.name || 'Session' });
   }
   return result;
+}
+
+// ── Split layout tree (Switchboard T5) ─────────────────────────────────────
+//
+// The work area's split is a binary tree: a leaf is a pane, a branch splits its space in two
+// (`row` = side by side, `col` = stacked) at `r` percent for the first child. Pure and
+// immutable (every function returns a new tree), so it is unit-tested without a DOM.
+//
+//   leaf:   { t: 'p', key, s }              s = session id, or null for an empty pane
+//   branch: { t: 's', key, d, r, a, b }
+//
+// `key` is a runtime identity only (it ties a node to its DOM and xterm instance) and never
+// leaves the browser; splitSerialize() strips it. Panes are lettered A, B, C, D in depth-first
+// order, and the first leaf is ALWAYS the primary pane (A): panes are only ever added as the
+// second child of a branch, and the primary pane is never removed.
+
+const SPLIT_MAX_PANES = 4;
+// The 3-pane default is left 1 + right top/bottom 2 with the left pane flex-grow 1.15 (spec).
+const SPLIT_DEFAULT_THIRD_RATIO = (100 * 1.15) / 2.15;
+
+function splitLeaves(node, out = []) {
+  if (node.t === 'p') out.push(node);
+  else {
+    splitLeaves(node.a, out);
+    splitLeaves(node.b, out);
+  }
+  return out;
+}
+
+function splitLetter(index) {
+  return 'ABCD'[index] || '';
+}
+
+function splitCanAddPane(root) {
+  return splitLeaves(root).length < SPLIT_MAX_PANES;
+}
+
+/** True for the left 1 + right top/bottom 2 shape that has not been dragged yet. */
+function splitIsUntouchedThreePane(root) {
+  return (
+    root.t === 's' &&
+    root.d === 'row' &&
+    root.r === 50 &&
+    root.a.t === 'p' &&
+    root.b.t === 's' &&
+    root.b.d === 'col' &&
+    root.b.a.t === 'p' &&
+    root.b.b.t === 'p'
+  );
+}
+
+/**
+ * Split the pane `targetKey` in direction `dir`, putting `newLeaf` second. Returns null when the
+ * tree is already at SPLIT_MAX_PANES or the target is not in it.
+ */
+function splitAddPane(root, targetKey, dir, newLeaf) {
+  if (!splitCanAddPane(root) || (dir !== 'row' && dir !== 'col')) return null;
+  let found = false;
+  const walk = (node) => {
+    if (node.t === 's') return { ...node, a: walk(node.a), b: walk(node.b) };
+    if (node.key !== targetKey) return node;
+    found = true;
+    return { t: 's', key: `n${newLeaf.key}`, d: dir, r: 50, a: node, b: newLeaf };
+  };
+  const next = walk(root);
+  if (!found) return null;
+  return splitLeaves(next).length === 3 && splitIsUntouchedThreePane(next)
+    ? { ...next, r: SPLIT_DEFAULT_THIRD_RATIO }
+    : next;
+}
+
+/** Remove a pane; its sibling takes the parent's place. Returns null if that empties the tree. */
+function splitRemovePane(root, key) {
+  const walk = (node) => {
+    if (node.t === 'p') return node.key === key ? null : node;
+    const a = walk(node.a);
+    const b = walk(node.b);
+    if (!a) return b;
+    if (!b) return a;
+    return { ...node, a, b };
+  };
+  return walk(root);
+}
+
+function splitSetRatio(root, nodeKey, percent) {
+  const r = clampDividerPercent(percent);
+  const walk = (node) => {
+    if (node.t === 'p') return node;
+    if (node.key === nodeKey) return { ...node, r, a: walk(node.a), b: walk(node.b) };
+    return { ...node, a: walk(node.a), b: walk(node.b) };
+  };
+  return walk(root);
+}
+
+function splitSetSession(root, key, sessionId) {
+  const walk = (node) =>
+    node.t === 's'
+      ? { ...node, a: walk(node.a), b: walk(node.b) }
+      : node.key === key
+        ? { ...node, s: sessionId }
+        : node;
+  return walk(root);
+}
+
+/** The shape stored by PUT /api/tab-layout (`split`). Null when there is nothing worth saving. */
+function splitSerialize(root, focusKey) {
+  const leaves = splitLeaves(root);
+  if (leaves.length < 2 || leaves.every((leaf) => leaf.s === null)) return null;
+  const walk = (node) =>
+    node.t === 'p'
+      ? { t: 'p', s: node.s }
+      : { t: 's', d: node.d, r: node.r, a: walk(node.a), b: walk(node.b) };
+  const focus = leaves.findIndex((leaf) => leaf.key === focusKey);
+  return focus >= 0 ? { root: walk(root), focus } : { root: walk(root) };
+}
+
+/**
+ * Rebuild a tree from a saved split. Defensive on purpose: the server already validated it, but
+ * this also runs on a layout written by another version, so anything malformed returns null
+ * (no split) rather than throwing, and a session named twice is kept in its first pane only.
+ * `nextKey()` mints the runtime keys.
+ */
+function splitDeserialize(saved, nextKey) {
+  if (!saved || typeof saved !== 'object') return null;
+  const seen = new Set();
+  let count = 0;
+  const build = (node, depth) => {
+    if (!node || typeof node !== 'object' || depth > SPLIT_MAX_PANES) return null;
+    if (node.t === 'p') {
+      if (++count > SPLIT_MAX_PANES) return null;
+      let s = typeof node.s === 'string' && node.s ? node.s : null;
+      if (s !== null && seen.has(s)) s = null;
+      if (s !== null) seen.add(s);
+      return { t: 'p', key: nextKey(), s };
+    }
+    if (node.t !== 's' || (node.d !== 'row' && node.d !== 'col') || !Number.isFinite(node.r)) return null;
+    const a = build(node.a, depth + 1);
+    const b = build(node.b, depth + 1);
+    if (!a || !b) return null;
+    return { t: 's', key: nextKey(), d: node.d, r: clampDividerPercent(node.r), a, b };
+  };
+  const root = build(saved.root, 0);
+  if (!root || count < 2) return null;
+  const leaves = splitLeaves(root);
+  const focusLeaf = Number.isInteger(saved.focus) ? leaves[saved.focus] : undefined;
+  return { root, focusKey: (focusLeaf || leaves[0]).key };
 }
 
 // ── Renderer liveness ──────────────────────────────────────────────────────
@@ -1861,6 +2009,17 @@ if (typeof window !== 'undefined') {
     clampDividerPercent,
     buildSplitPickerSessions,
     SPLIT_PANE_MIN_WIDTH,
+    SPLIT_MAX_PANES,
+    SPLIT_DEFAULT_THIRD_RATIO,
+    splitLeaves,
+    splitLetter,
+    splitCanAddPane,
+    splitAddPane,
+    splitRemovePane,
+    splitSetRatio,
+    splitSetSession,
+    splitSerialize,
+    splitDeserialize,
   };
   window.CodemanRenderLiveness = { shouldKickRenderer, RENDER_STALL_MS, RENDER_LIVENESS_POLL_MS };
   window.CodemanFetchDeadline = {

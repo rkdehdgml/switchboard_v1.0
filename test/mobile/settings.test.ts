@@ -68,7 +68,6 @@ describe('Settings Modal', () => {
       });
 
       if (defaults !== null) {
-        expect(defaults.showFontControls).toBe(false);
         expect(defaults.showSystemStats).toBe(false);
         expect(defaults.showTokenCount).toBe(false);
         expect(defaults.showCost).toBe(false);
@@ -248,11 +247,11 @@ describe('Settings Modal', () => {
       }, STORAGE_KEYS.SETTINGS_MOBILE);
     }
 
-    it('font controls toggle changes and persists', async () => {
-      await openSettingsAndToggle('showFontControls');
+    it('system stats toggle changes and persists', async () => {
+      await openSettingsAndToggle('showSystemStats');
       const settings = await getStoredSettings();
       if (settings) {
-        expect(settings).toHaveProperty('showFontControls');
+        expect(settings).toHaveProperty('showSystemStats');
       }
     });
 

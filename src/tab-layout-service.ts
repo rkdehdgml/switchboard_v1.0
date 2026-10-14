@@ -12,6 +12,7 @@ import {
   flattenOwnerSessionOrder,
   materializeOrphans,
   normalizeTabLayout,
+  splitSessionIds,
   TabLayoutValidationError,
   validateTabLayout,
   type TabLayout,
@@ -352,6 +353,9 @@ export class TabLayoutService {
       const invalid = refs.find((ref) => !owned.has(refKey(ref)));
       if (invalid)
         throw new TabLayoutValidationError(`ref is not owned by layout owner: ${invalid.kind}:${invalid.id}`);
+      const foreignPane = splitSessionIds(validated.split).find((id) => !owned.has(refKey({ kind: 'session', id })));
+      if (foreignPane)
+        throw new TabLayoutValidationError(`split pane session is not owned by layout owner: ${foreignPane}`);
       const normalized = normalizeTabLayout(
         { ...validated, version: prepared.authoritative.version },
         prepared.metadata

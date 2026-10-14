@@ -1582,6 +1582,19 @@ export class Session extends EventEmitter {
     this._totalCost = totalCost;
   }
 
+  /**
+   * Cost reported by the Claude statusline for an interactive session. Cost only:
+   * `restoreTokens` rejects any total over MAX_SESSION_TOKENS and the statusline's
+   * running totals pass it in long sessions, and feeding them into the token
+   * counters would also change the daily/global stats that read those counters.
+   * @returns whether the stored cost changed
+   */
+  applyTelemetryCost(totalCost: number): boolean {
+    if (!Number.isFinite(totalCost) || totalCost < 0 || totalCost === this._totalCost) return false;
+    this._totalCost = totalCost;
+    return true;
+  }
+
   get autoClearThreshold(): number {
     return this._autoOps.autoClearThreshold;
   }

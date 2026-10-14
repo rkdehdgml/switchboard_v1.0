@@ -13,7 +13,51 @@
  * @loadorder 6.5 (after app.js, before terminal-ui.js)
  */
 
+/** Dragging the rail's edge left of this many px (from the main area's left edge) folds it. */
+const TAB_RAIL_COLLAPSE_SNAP = 150;
+
 Object.assign(CodemanApp.prototype, {
+  // ── Collapse (Switchboard) ─────────────────────────────────────────────
+  // The rail is always on desktop; the user folds it with an arrow. Collapsed means width 0 and
+  // the arrow alone on screen, NOT an icon strip. State is per device in its own key (never the
+  // settings blob: saveAppSettings() rebuilds that from the DOM), mirrored on <html data-tab-rail>
+  // so CSS and the pre-paint script in index.html agree before any JS runs.
+
+  isTabRailCollapsed() {
+    return document.documentElement.dataset.tabRail === 'collapsed';
+  },
+
+  _syncTabRailToggle() {
+    const btn = document.getElementById('tabRailToggle');
+    if (!btn) return;
+    const collapsed = this.isTabRailCollapsed();
+    const label = collapsed ? 'Expand session list' : 'Collapse session list';
+    btn.setAttribute('aria-expanded', String(!collapsed));
+    btn.setAttribute('aria-label', label);
+    btn.setAttribute('title', label);
+  },
+
+  setTabRailCollapsed(collapsed) {
+    if (this.isTabRailCollapsed() === collapsed) return;
+    document.documentElement.dataset.tabRail = collapsed ? 'collapsed' : 'expanded';
+    try {
+      localStorage.setItem('codeman-tab-rail-collapsed', collapsed ? '1' : '0');
+    } catch {}
+    this._syncTabRailToggle();
+    // Focus inside a rail that just became hidden would fall to <body>; hand it to the arrow.
+    if (collapsed && document.getElementById('tabRail')?.contains(document.activeElement)) {
+      document.getElementById('tabRailToggle')?.focus();
+    }
+    // The terminal's width changed: same single settle-time resize a drag ends with.
+    this._claimTabRailResize();
+    this._scheduleTabRailSettle(this._getCurrentTabRailWidth());
+    this._updateConnectionLinesImmediate?.();
+  },
+
+  toggleTabRail() {
+    this.setTabRailCollapsed(!this.isTabRailCollapsed());
+  },
+
   _getTabRailMinimumTerminalWidth() {
     const cellWidth = this.terminal?._core?._renderService?.dimensions?.css?.cell?.width;
     if (Number.isFinite(cellWidth) && cellWidth > 0) return Math.ceil(cellWidth * 40 + 24);
@@ -228,7 +272,17 @@ Object.assign(CodemanApp.prototype, {
     try {
       if (handle.hasPointerCapture?.(pointerId)) handle.releasePointerCapture(pointerId);
     } catch {}
+    // Dragged well past the minimum width: fold it. The pointer only ever took the width down to the
+    // minimum on the way, so put back the width the drag STARTED at; the arrow then brings the rail
+    // back at the size the user had.
+    const main = document.querySelector('.main');
+    const raw = Number(this._tabRailPendingClientX) - (main ? main.getBoundingClientRect().left : 0);
+    const fold = Number.isFinite(raw) && raw < TAB_RAIL_COLLAPSE_SNAP;
+    if (fold && Number.isFinite(this._tabRailDragStartWidth)) {
+      this._tabRailDragWidth = this._setTabRailWidth(this._tabRailDragStartWidth);
+    }
     const preferred = window.CodemanTabRail?.resolveWidth({ width: this._tabRailDragWidth }) ?? this._tabRailDragWidth;
+    if (fold) this.setTabRailCollapsed(true);
     this._scheduleTabRailSettle(this._tabRailDragWidth || this._getCurrentTabRailWidth(), preferred);
   },
 
@@ -251,6 +305,7 @@ Object.assign(CodemanApp.prototype, {
     const handle = document.getElementById('tabRailResizeHandle');
     if (!handle || handle.dataset.ready === '1') return;
     handle.dataset.ready = '1';
+    this._syncTabRailToggle();
     this.applyTabRailWidth();
     handle.addEventListener('pointerdown', (event) => {
       if (event.button !== 0) return;
@@ -258,6 +313,7 @@ Object.assign(CodemanApp.prototype, {
       this.closeTabRailActionMenu();
       this._claimTabRailResize();
       this._tabRailDragWidth = this._getCurrentTabRailWidth();
+      this._tabRailDragStartWidth = this._tabRailDragWidth;
       this._tabRailPendingClientX = event.clientX;
       document.body.classList.add('tab-rail-resizing');
       const shield = document.getElementById('tabRailResizeShield');

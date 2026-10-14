@@ -372,21 +372,21 @@ Object.assign(CodemanApp.prototype, {
   openAppSettings() {
     // Load current settings
     const settings = this.loadAppSettingsFromStorage();
-    document.getElementById('appSettingsDisplayName').value = settings.displayName || 'Codeman';
-    document.getElementById('appSettingsLanguage').value = settings.language === 'zh-CN' ? 'zh-CN' : 'en';
+    document.getElementById('appSettingsDisplayName').value = window.CodemanI18n?.normalizeDisplayName(settings.displayName) || 'Switchboard';
+    document.getElementById('appSettingsLanguage').value =
+      window.CodemanI18n?.normalizeLanguage(settings.language) ?? 'ko';
     document.getElementById('appSettingsClaudeMdPath').value = settings.defaultClaudeMdPath || '';
     document.getElementById('appSettingsDefaultDir').value = settings.defaultWorkingDir || '';
     // Use device-aware defaults for display settings (mobile has different defaults)
     const defaults = this.getDefaultSettings();
     document.getElementById('appSettingsRalphEnabled').checked = settings.ralphTrackerEnabled ?? defaults.ralphTrackerEnabled ?? false;
     // Header visibility settings
-    document.getElementById('appSettingsShowFontControls').checked = settings.showFontControls ?? defaults.showFontControls ?? false;
     document.getElementById('appSettingsShowSystemStats').checked = settings.showSystemStats ?? defaults.showSystemStats ?? true;
     document.getElementById('appSettingsShowLifecycleLog').checked = settings.showLifecycleLog ?? defaults.showLifecycleLog ?? false;
     document.getElementById('appSettingsShowResponseViewer').checked = settings.showResponseViewer ?? defaults.showResponseViewer ?? false;
     document.getElementById('appSettingsShowFileViewerButton').checked = settings.showFileViewerButton ?? defaults.showFileViewerButton ?? true;
     document.getElementById('appSettingsShowAttachmentsButton').checked = settings.showAttachmentsButton ?? defaults.showAttachmentsButton ?? false;
-    document.getElementById('appSettingsSkin').value = settings.skin ?? defaults.skin ?? 'daylight-blue';
+    this.renderThemeControls?.();
     // Entrance animations. Deliberately NOT part of the settings payload: the
     // styles persist to their own localStorage keys via setAnimTheme(), which
     // keeps them per-device without touching the .strict() SettingsUpdateSchema.
@@ -473,8 +473,6 @@ Object.assign(CodemanApp.prototype, {
     document.getElementById('appSettingsCjkInput').checked = settings.cjkInputEnabled ?? defaults.cjkInputEnabled ?? false;
     document.getElementById('appSettingsExtendedKeyboardBar').checked = settings.extendedKeyboardBar ?? false;
     document.getElementById('appSettingsTabTwoRows').checked = settings.tabTwoRows ?? defaults.tabTwoRows ?? false;
-    document.getElementById('appSettingsTabOrientation').value =
-      settings.tabOrientation ?? defaults.tabOrientation ?? 'horizontal';
     const tabRailWidth = window.CodemanTabRail?.resolveWidth({
       // Same default resolution as applyTabRailWidth(): a rail that has never
       // been sized shows the width it is actually rendering at, which for
@@ -632,6 +630,7 @@ Object.assign(CodemanApp.prototype, {
     // waiting, are the two things worth seeing before any preference. The rest of
     // the system settings (paths, automation, remote access) tail the document.
     this.switchSettingsTab('settings-updates');
+    window.CodemanWorkFolders?.refresh?.();
     const modal = document.getElementById('appSettingsModal');
     modal.classList.add('active');
 
@@ -2137,7 +2136,7 @@ Object.assign(CodemanApp.prototype, {
     const settings = {
       displayName: window.CodemanI18n?.normalizeDisplayName(
         document.getElementById('appSettingsDisplayName').value
-      ) || 'Codeman',
+      ) || 'Switchboard',
       language: window.CodemanI18n?.normalizeLanguage(
         document.getElementById('appSettingsLanguage').value
       ) || 'en',
@@ -2145,7 +2144,6 @@ Object.assign(CodemanApp.prototype, {
       defaultWorkingDir: document.getElementById('appSettingsDefaultDir').value.trim(),
       ralphTrackerEnabled: document.getElementById('appSettingsRalphEnabled').checked,
       // Header visibility settings
-      showFontControls: document.getElementById('appSettingsShowFontControls').checked,
       showSystemStats: document.getElementById('appSettingsShowSystemStats').checked,
       showLifecycleLog: document.getElementById('appSettingsShowLifecycleLog').checked,
       showResponseViewer: document.getElementById('appSettingsShowResponseViewer').checked,
@@ -2189,7 +2187,6 @@ Object.assign(CodemanApp.prototype, {
       webglRendererEnabled: document.getElementById('appSettingsWebglRenderer').checked,
       extendedKeyboardBar: document.getElementById('appSettingsExtendedKeyboardBar').checked,
       tabTwoRows: document.getElementById('appSettingsTabTwoRows').checked,
-      tabOrientation: document.getElementById('appSettingsTabOrientation').value,
       tabRailWidth: this.readTabRailWidthSetting?.() ?? 256,
       tabRailDetail: document.getElementById('appSettingsTabRailDetail').value,
       tabRailSort: document.getElementById('appSettingsTabRailSort').value,
@@ -2198,7 +2195,9 @@ Object.assign(CodemanApp.prototype, {
       sessionSidebarFontSize: this.resolveSessionSidebarFontSize(
         document.getElementById('appSettingsSessionSidebarFontSize').value
       ),
-      skin: document.getElementById('appSettingsSkin').value,
+      // Theme is applied live by theme-ui.js (no Save button); carry the saved values over,
+      // because this object REPLACES the stored settings blob.
+      ...(window.CodemanTheme?.normalizeTheme(_prev) ?? {}),
       // Claude CLI settings
       claudeMode: document.getElementById('appSettingsClaudeMode').value,
       allowedTools: document.getElementById('appSettingsAllowedTools').value.trim(),
@@ -3058,7 +3057,6 @@ Object.assign(CodemanApp.prototype, {
       // Mobile defaults: minimal UI for small screens
       return {
         // Header visibility - hide everything on mobile
-        showFontControls: false,
         showSystemStats: false,
         showTokenCount: false,
         showCost: false,
@@ -3149,7 +3147,10 @@ Object.assign(CodemanApp.prototype, {
   applySkin() {
     const settings = this.loadAppSettingsFromStorage();
     const defaults = this.getDefaultSettings();
-    const skin = settings.skin ?? defaults.skin ?? 'daylight-blue';
+    // Resolved from themeMode/darkSkin/lightSkin (theme-ui.js); `skin` itself is no longer a setting.
+    const skin = this.resolveThemeSkin?.(settings) ?? settings.skin ?? defaults.skin ?? 'daylight-blue';
+    this._installThemeSystemListener?.();
+    this.syncWindowTitleBar?.(settings);
     document.documentElement.setAttribute('data-skin', skin);
     window.__codemanSkin = skin;
     const themeColor = getComputedStyle(document.documentElement).getPropertyValue('--bg-dark').trim();
@@ -3211,19 +3212,14 @@ Object.assign(CodemanApp.prototype, {
     const showTabDetach = settings.showTabDetachButton ?? defaults.showTabDetachButton ?? false;
     document.documentElement.classList.toggle('tabs-show-detach', showTabDetach);
     const compactHeader = MobileDetection.getDeviceType() !== 'desktop';
-    const showFontControls = compactHeader ? false : (settings.showFontControls ?? defaults.showFontControls ?? false);
     const showSystemStats = compactHeader ? false : (settings.showSystemStats ?? defaults.showSystemStats ?? true);
     // Default OFF: the header stays gear + usage chips + files button unless a
     // stored preference explicitly re-enables the token chip (no UI toggle exists).
     const showTokenCount = compactHeader ? false : (settings.showTokenCount ?? defaults.showTokenCount ?? false);
 
-    const fontControlsEl = document.querySelector('.header-font-controls');
     const systemStatsEl = document.getElementById('headerSystemStats');
     const tokenCountEl = document.getElementById('headerTokens');
 
-    if (fontControlsEl) {
-      fontControlsEl.style.display = showFontControls ? '' : 'none';
-    }
     if (systemStatsEl) {
       systemStatsEl.style.display = showSystemStats ? '' : 'none';
     }
@@ -3369,7 +3365,6 @@ Object.assign(CodemanApp.prototype, {
       !this.isSoloWindow && !sidebarOwnsTabs && window.CodemanTabOverflow?.resolveTabOrientation
         ? window.CodemanTabOverflow.resolveTabOrientation({
             deviceType: MobileDetection.getDeviceType(),
-            setting: settings.tabOrientation ?? defaults.tabOrientation ?? 'horizontal',
           })
         : 'horizontal';
 
@@ -3398,7 +3393,8 @@ Object.assign(CodemanApp.prototype, {
     const headerHost = document.getElementById('sessionTabsHost');
     if (!sidebarOwnsTabs && tabsEl && rail && headerHost) {
       if (orientation === 'vertical') {
-        if (tabsEl.parentElement !== rail) rail.appendChild(tabsEl);
+        // Between the pinned search and the pinned "New session" (T3), never after the footer.
+        if (tabsEl.parentElement !== rail) rail.insertBefore(tabsEl, rail.querySelector('.tab-rail-foot'));
       } else if (tabsEl.parentElement !== headerHost) {
         headerHost.appendChild(tabsEl);
       }
@@ -3686,7 +3682,7 @@ Object.assign(CodemanApp.prototype, {
         // NOTE: Feature toggles (subagentTrackingEnabled, imageWatcherEnabled, ralphTrackerEnabled)
         // are NOT display keys — they control server-side behavior and must sync from server.
         const displayKeys = new Set([
-          'showFontControls', 'showSystemStats', 'showTokenCount', 'showCost',
+          'showSystemStats', 'showTokenCount', 'showCost',
           'showLifecycleLog', 'showResponseViewer', 'showRedrawButton',
           'showMonitor', 'showProjectInsights', 'showFileBrowser', 'showSubagents',
           'subagentActiveTabOnly', 'tabTwoRows', 'tabOrientation', 'tabRailWidth', 'tabRailDetail', 'tabRailSort', 'sessionListLayout', 'sessionSidebarFontSize', 'localEchoEnabled', 'cjkInputEnabled', 'extendedKeyboardBar',
@@ -3726,6 +3722,8 @@ Object.assign(CodemanApp.prototype, {
             merged[key] = value;
           }
         }
+        // Pre-T1 `skin` → server themeMode/darkSkin/lightSkin, once.
+        this.migrateThemeToServer?.(appSettings, merged);
         this.saveAppSettingsToStorage(merged);
 
         // Apply notification prefs from server if present (only if localStorage has none)

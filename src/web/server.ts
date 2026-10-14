@@ -170,11 +170,14 @@ import { isMultiUserMode } from '../config/multiuser.js';
 import { bootstrapInitialAdmin, hasUsers, resolveClaudeModeForUsername } from '../user-store.js';
 import { installRouteErrorHandler } from './route-error-handler.js';
 import { isExplicitlyEnabled, isLoopbackBindHost, buildHostPolicy, type HostPolicy } from './network-auth-policy.js';
+import { DESKTOP_BIND_HOST, getDesktopMode } from './desktop-mode.js';
 import {
   registerPushRoutes,
   registerTeamRoutes,
   registerMuxRoutes,
   registerFileRoutes,
+  registerNativeFolderRoutes,
+  registerWorkFolderRoutes,
   registerScheduledRoutes,
   registerHookEventRoutes,
   registerApprovalRoutes,
@@ -197,6 +200,7 @@ import {
   registerVoiceRoutes,
   registerWebviewRoutes,
   registerTabLayoutRoutes,
+  registerUsageRoutes,
   registerCustomModelRoutes,
   refreshAllCustomModelHosts,
   readCustomModelEndpointsEnabled,
@@ -207,6 +211,7 @@ import {
   registerCliRegistryRoutes,
 } from './routes/index.js';
 import { isLostWebviewFrameNavigation } from './webview-proxy.js';
+import { THEME_MODES, DARK_SKINS, LIGHT_SKINS } from './schemas.js';
 import { CronService } from '../cron/cron-service.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -781,7 +786,7 @@ export class WebServer extends EventEmitter {
    * runtime (PUT /api/settings) is reflected without a restart.
    */
   private getHostPolicy(): HostPolicy {
-    return buildHostPolicy(this.host, this.tunnelManager.getUrl());
+    return buildHostPolicy(this.host, this.tunnelManager.getUrl(), getDesktopMode()?.port);
   }
 
   private async setupRoutes(): Promise<void> {
@@ -1109,6 +1114,8 @@ export class WebServer extends EventEmitter {
     registerTeamRoutes(this.app, ctx);
     registerMuxRoutes(this.app, ctx);
     registerFileRoutes(this.app, ctx);
+    registerNativeFolderRoutes(this.app, ctx);
+    registerWorkFolderRoutes(this.app);
     registerScheduledRoutes(this.app, ctx);
     registerHookEventRoutes(this.app, ctx);
     registerApprovalRoutes(this.app, ctx);
@@ -1130,6 +1137,7 @@ export class WebServer extends EventEmitter {
     registerOrchestratorRoutes(this.app, ctx);
     registerWebviewRoutes(this.app, ctx, this.basePath);
     registerTabLayoutRoutes(this.app, ctx);
+    registerUsageRoutes(this.app, ctx);
     registerCustomModelRoutes(this.app);
     registerCliRegistryRoutes(this.app);
 
@@ -1568,15 +1576,35 @@ export class WebServer extends EventEmitter {
     const persistedSettings: Record<string, unknown> = soloSessionId ? {} : await this.readSettings(true);
     const configuredDisplayName =
       typeof persistedSettings.displayName === 'string' ? persistedSettings.displayName.trim() : '';
-    const displayName = configuredDisplayName || 'Codeman';
+    // A stored "Codeman" is what every settings save wrote before the Switchboard rename: not a choice.
+    const displayName =
+      !configuredDisplayName || configuredDisplayName === 'Codeman' ? 'Switchboard' : configuredDisplayName;
     // Solo renders read no settings; recomputing here would reset the shared
     // push-notification prefix (hostTitle) to the default name.
     if (!soloSessionId) {
-      this.windowTitle = `${displayName === 'Codeman' ? 'codeman' : displayName}:${this.titleHostname}`;
+      this.windowTitle = `${displayName}:${this.titleHostname}`;
     }
     let html = this.indexHtmlTemplate.replace(
       '<title>Codeman</title>',
       `<title>${escapeHtmlText(this.windowTitle)}</title>`
+    );
+    // Theme, resolved server-side so the first paint already has the right
+    // attributes. Only allow-listed values are written into the markup, so a
+    // hand-edited settings.json cannot inject HTML. `system` cannot be resolved
+    // here (the server does not know the OS mode); index.html's pre-paint script
+    // picks between the two skins with matchMedia.
+    const pick = <T extends string>(allowed: readonly T[], value: unknown, fallback: T): T =>
+      allowed.includes(value as T) ? (value as T) : fallback;
+    html = html.replace(
+      '<html lang="en">',
+      `<html lang="en" data-theme-mode="${pick(THEME_MODES, persistedSettings.themeMode, 'system')}"` +
+        // Present only once a theme was saved. Until then a pre-T1 install's
+        // localStorage skin still wins, until the client migrates it to the server.
+        (THEME_MODES.includes(persistedSettings.themeMode as (typeof THEME_MODES)[number])
+          ? ' data-theme-stored="1"'
+          : '') +
+        ` data-dark-skin="${pick(DARK_SKINS, persistedSettings.darkSkin, DARK_SKINS[0])}"` +
+        ` data-light-skin="${pick(LIGHT_SKINS, persistedSettings.lightSkin, LIGHT_SKINS[0])}">`
     );
     // Reverse-proxy sub-path support. The template ships `<base href="/">` and all
     // static asset refs are RELATIVE, so pointing the base at the mount prefix
@@ -2794,6 +2822,10 @@ export class WebServer extends EventEmitter {
   }
 
   async start(): Promise<void> {
+    // Desktop mode must never be reachable from the network, whatever launched it.
+    if (getDesktopMode() && this.host !== DESKTOP_BIND_HOST) {
+      throw new Error(`Desktop mode only binds ${DESKTOP_BIND_HOST} (got ${this.host})`);
+    }
     // Multi-user first boot: create the initial admin from CODEMAN_USERNAME/PASSWORD
     // if there are no users yet, else refuse to start (there would be no way in).
     if (isMultiUserMode() && !this.testMode) {
@@ -2893,7 +2925,7 @@ export class WebServer extends EventEmitter {
     // Opt-in: also serve the HOOK endpoints on the docker bridge gateway so
     // in-container hooks (permission/idle/stop callbacks) can reach a loopback-bound
     // server. Hooks-only + secret-gated, and the bridge is host-internal (not the LAN).
-    if (!this.testMode) {
+    if (!this.testMode && !getDesktopMode()) {
       await this._startDockerBridgeHooksListener().catch((err) =>
         console.error(`[Docker] bridge-hooks listener error: ${err?.message || err}`)
       );

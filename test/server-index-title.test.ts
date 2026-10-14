@@ -1,8 +1,8 @@
 /**
  * Verifies that WebServer templates the `<title>` tag in the served
- * index.html with the hostname-aware `codeman:<host>` window title
+ * index.html with the hostname-aware `Switchboard:<host>` window title
  * (feature #82). The title must:
- *   - default to `codeman:<os.hostname()>` when no override is supplied
+ *   - default to `Switchboard:<os.hostname()>` when no override is supplied
  *   - honor a custom `titleHostname` passed via the constructor (CLI flag
  *     `--title-hostname <host>` plumbs through to here)
  *   - HTML-escape the hostname so a value like `<script>foo</script>`
@@ -55,15 +55,15 @@ describe('WebServer index.html <title> templating (#82)', () => {
     else process.env.CODEMAN_DATA_DIR = _prevDataDir;
   });
 
-  it('substitutes the bare <title>Codeman</title> with codeman:<host>', async () => {
+  it('substitutes the bare <title>Codeman</title> with Switchboard:<host>', async () => {
     const html = await render('laptop');
-    expect(html).toContain('<title>codeman:laptop</title>');
+    expect(html).toContain('<title>Switchboard:laptop</title>');
     expect(html).not.toContain('<title>Codeman</title>');
   });
 
   it('defaults to os.hostname() when no titleHostname is supplied', async () => {
     const html = await render();
-    const expected = `<title>codeman:${osHostname()}</title>`;
+    const expected = `<title>Switchboard:${osHostname()}</title>`;
     expect(html).toContain(expected);
   });
 
@@ -71,15 +71,15 @@ describe('WebServer index.html <title> templating (#82)', () => {
     // CLI normally guarantees a non-empty string, but the constructor's
     // `titleHostname || getHostname()` guard makes empty fall through —
     // pin that behavior so a future refactor doesn't accidentally ship
-    // a `<title>codeman:</title>` to users.
+    // a `<title>Switchboard:</title>` to users.
     const html = await render('');
-    expect(html).toMatch(/<title>codeman:.+<\/title>/);
-    expect(html).not.toContain('<title>codeman:</title>');
+    expect(html).toMatch(/<title>Switchboard:.+<\/title>/);
+    expect(html).not.toContain('<title>Switchboard:</title>');
   });
 
   it('HTML-escapes < > & in the hostname so it cannot break out of the title tag', async () => {
     const html = await render('<script>alert(1)</script>');
-    expect(html).toContain('<title>codeman:&lt;script&gt;alert(1)&lt;/script&gt;</title>');
+    expect(html).toContain('<title>Switchboard:&lt;script&gt;alert(1)&lt;/script&gt;</title>');
     // The raw closing </title> from the injected payload must NOT appear
     // outside the actual title element — escape-then-substitute prevents
     // an attacker-controlled hostname from terminating the tag early.
@@ -90,7 +90,7 @@ describe('WebServer index.html <title> templating (#82)', () => {
     // The escaper replaces & first, then < and >. A hostname that already
     // contains a literal `&` should render as `&amp;` once, not `&amp;amp;`.
     const html = await render('a&b');
-    expect(html).toContain('<title>codeman:a&amp;b</title>');
+    expect(html).toContain('<title>Switchboard:a&amp;b</title>');
     expect(html).not.toContain('&amp;amp;');
   });
 
@@ -113,13 +113,15 @@ describe('WebServer index.html <title> templating (#82)', () => {
       .replace(/<script>window\.__codemanCustomModelClis=\[.*?\];<\/script>\n/, '')
       // Injected unconditionally as an object keyed by run mode, empty when no
       // enabled CLI declares a gutter, so it needs stripping on every machine.
-      .replace(/<script>window\.__codemanTranscriptGutter=\{.*?\};<\/script>\n/, '');
+      .replace(/<script>window\.__codemanTranscriptGutter=\{.*?\};<\/script>\n/, '')
+      // Theme attributes the server writes on <html> (T1) so the first paint is right.
+      .replace(/ data-theme-mode="[^"]*"( data-theme-stored="1")? data-dark-skin="[^"]*" data-light-skin="[^"]*"/, '');
     const beforeTitle = rawTemplate.split('<title>Codeman</title>')[0];
     const afterTitle = rawTemplate.split('<title>Codeman</title>')[1];
     expect(html.startsWith(beforeTitle)).toBe(true);
     expect(html.endsWith(afterTitle)).toBe(true);
     // Sanity check: length differs only by the title swap.
-    const expectedDelta = `<title>codeman:laptop</title>`.length - `<title>Codeman</title>`.length;
+    const expectedDelta = `<title>Switchboard:laptop</title>`.length - `<title>Codeman</title>`.length;
     expect(html.length - rawTemplate.length).toBe(expectedDelta);
   });
 
@@ -129,7 +131,7 @@ describe('WebServer index.html <title> templating (#82)', () => {
     // second `<title>Codeman</title>` (e.g. inside a <noscript>) and only
     // the first gets templated — would leave a stale literal in the served
     // HTML that overrides the correct one in some renderers.
-    const occurrencesOfNew = html.split('<title>codeman:laptop</title>').length - 1;
+    const occurrencesOfNew = html.split('<title>Switchboard:laptop</title>').length - 1;
     const occurrencesOfOld = html.split('<title>Codeman</title>').length - 1;
     expect(occurrencesOfNew).toBe(1);
     expect(occurrencesOfOld).toBe(0);
@@ -138,8 +140,8 @@ describe('WebServer index.html <title> templating (#82)', () => {
   it('two WebServer instances on different hostnames render distinct titles', async () => {
     const htmlA = await render('host-a');
     const htmlB = await render('host-b');
-    expect(htmlA).toContain('<title>codeman:host-a</title>');
-    expect(htmlB).toContain('<title>codeman:host-b</title>');
+    expect(htmlA).toContain('<title>Switchboard:host-a</title>');
+    expect(htmlB).toContain('<title>Switchboard:host-b</title>');
     expect(htmlA).not.toContain('host-b');
     expect(htmlB).not.toContain('host-a');
   });

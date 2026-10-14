@@ -84,7 +84,10 @@ export function registerWsRoutes(app: FastifyInstance, ctx: SessionPort, getHost
       // injects keystrokes into a --dangerously-skip-permissions agent, so this gate
       // matters even on the default no-password install. See security review H5.
       const policy = getHostPolicy();
-      if (!isAllowedRequestHost(req.headers.host, policy) || !isAllowedRequestOrigin(req.headers.origin, policy)) {
+      if (
+        !isAllowedRequestHost(req.headers.host, policy) ||
+        !isAllowedRequestOrigin(req.headers.origin, policy, true)
+      ) {
         socket.close(4003, 'Forbidden');
         return;
       }

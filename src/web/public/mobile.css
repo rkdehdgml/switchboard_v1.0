@@ -10,7 +10,8 @@
    The inline <script> in <head> adds .mobile-init to <html> synchronously.
    app.init() removes .mobile-init after applying visibility settings.
    ============================================================================ */
-html.mobile-init .header-font-controls,
+html.mobile-init .header-menu,
+html.mobile-init .btn-header-palette,
 html.mobile-init .header-system-stats,
 html.mobile-init .header-tokens,
 html.mobile-init .monitor-panel,
@@ -27,6 +28,13 @@ html.mobile-init .file-browser-panel {
    touch-action: manipulation prevents double-tap zoom.
    ============================================================================ */
 @media (max-width: 768px) {
+  /* Desktop menu bar (T2): the phone/tablet header is deliberately minimal; every
+     menu entry is also reachable from the command palette. */
+  .header-menu,
+  .btn-header-palette {
+    display: none !important;
+  }
+
   /* Prevent iOS auto-zoom on input focus (triggers at font-size < 16px) */
   input, textarea, select {
     font-size: 16px !important;
@@ -82,17 +90,6 @@ html.mobile-init .file-browser-panel {
 
   .ios-device .app {
     padding-top: calc(54px + var(--safe-area-top));
-  }
-
-  /* Font controls - smaller on tablet, visibility controlled by JS */
-  .header-font-controls {
-    gap: 0.15rem;
-    padding: 0.15rem 0.25rem;
-  }
-
-  .header-font-controls .btn-icon-sm {
-    width: 18px;
-    height: 18px;
   }
 
   /* System stats - compact on tablet, visibility controlled by JS */
@@ -424,22 +421,6 @@ html.mobile-init .file-browser-panel {
 
   .header-brand .logo .logo-compact {
     display: inline;
-  }
-
-  /* Font controls - compact on phones, visibility controlled by JS */
-  .header-font-controls {
-    gap: 0.1rem;
-    padding: 0.1rem 0.2rem;
-  }
-
-  .header-font-controls .btn-icon-sm {
-    width: 16px;
-    height: 16px;
-  }
-
-  .header-font-controls .font-size-display {
-    font-size: 0.6rem;
-    min-width: 14px;
   }
 
   /* System stats - very compact on phones, visibility controlled by JS */

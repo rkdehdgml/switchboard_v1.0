@@ -57,7 +57,8 @@ describe('split-pane orchestration in a real browser', () => {
 
     const duringSplit = await page.evaluate(() => ({
       hasContainer: document.querySelector('.terminal-split-container') !== null,
-      wrapIsChildOfContainer: document.querySelector('.terminal-split-container > .terminal-wrap') !== null,
+      wrapIsChildOfContainer:
+        document.querySelector('.terminal-split-container .split-leaf--primary > .terminal-wrap') !== null,
       hasPaneB: document.querySelector('.terminal-pane-b') !== null,
     }));
     expect(duringSplit.hasContainer).toBe(true);

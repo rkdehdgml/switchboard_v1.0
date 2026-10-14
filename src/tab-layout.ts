@@ -8,6 +8,11 @@
 export const MAX_TAB_GROUPS = 32;
 export const MAX_TAB_GROUP_NAME_LENGTH = 60;
 export const MAX_TAB_REFS = 512;
+/** More xterm instances and sockets than this drop frames (see the T5 spec). */
+export const MAX_SPLIT_PANES = 4;
+export const MIN_SPLIT_RATIO = 5;
+export const MAX_SPLIT_RATIO = 95;
+const MAX_SPLIT_SESSION_ID_LENGTH = 200;
 
 export type TabRefKind = 'session' | 'webview';
 
@@ -23,11 +28,39 @@ export interface TabGroup {
   refs: TabRef[];
 }
 
+/** A pane of a saved split layout; `s` is its session id, or null for an empty pane. */
+export interface SplitPaneNode {
+  t: 'p';
+  s: string | null;
+}
+
+/** Two children side by side (`row`) or stacked (`col`); `r` is the first child's share in percent. */
+export interface SplitBranchNode {
+  t: 's';
+  d: 'row' | 'col';
+  r: number;
+  a: SplitNode;
+  b: SplitNode;
+}
+
+export type SplitNode = SplitPaneNode | SplitBranchNode;
+
+/**
+ * The saved split of the work area (Switchboard T5). The first pane in depth-first order is
+ * always the primary pane (A); `focus` is the index of the focused pane in that same order.
+ */
+export interface SplitLayout {
+  root: SplitNode;
+  focus?: number;
+}
+
 export interface TabLayout {
   version: number;
   groups: TabGroup[];
   ungrouped: TabRef[];
   updatedAt: string;
+  /** Absent = no saved split. */
+  split?: SplitLayout;
 }
 
 /** Owner and lineage facts supplied by the server or browser integration. */
@@ -107,6 +140,92 @@ function parseRef(value: unknown, label: string): TabRef {
   return value.placement === 'manual' ? { kind: value.kind, id, placement: 'manual' } : { kind: value.kind, id };
 }
 
+function parseSplitNode(
+  value: unknown,
+  label: string,
+  state: { leaves: number; seen: Set<string>; repairDuplicates: boolean },
+  depth: number
+): SplitNode {
+  assertRecord(value, label);
+  if (value.t === 'p') {
+    state.leaves += 1;
+    if (state.leaves > MAX_SPLIT_PANES) {
+      throw new TabLayoutValidationError(`${label}: a split cannot have more than ${MAX_SPLIT_PANES} panes`);
+    }
+    if (value.s === null || value.s === undefined) return { t: 'p', s: null };
+    if (typeof value.s !== 'string' || value.s.length === 0 || value.s.length > MAX_SPLIT_SESSION_ID_LENGTH) {
+      throw new TabLayoutValidationError(`${label}.s must be a session id or null`);
+    }
+    if (state.seen.has(value.s)) {
+      if (!state.repairDuplicates) throw new TabLayoutValidationError(`${label}: session is in two panes`);
+      return { t: 'p', s: null };
+    }
+    state.seen.add(value.s);
+    return { t: 'p', s: value.s };
+  }
+  if (value.t !== 's') throw new TabLayoutValidationError(`${label}.t must be p or s`);
+  // MAX_SPLIT_PANES leaves need MAX_SPLIT_PANES - 1 splits, so nesting never goes deeper than that.
+  if (depth >= MAX_SPLIT_PANES - 1) throw new TabLayoutValidationError(`${label}: split is nested too deeply`);
+  if (value.d !== 'row' && value.d !== 'col') throw new TabLayoutValidationError(`${label}.d must be row or col`);
+  if (
+    typeof value.r !== 'number' ||
+    !Number.isFinite(value.r) ||
+    value.r < MIN_SPLIT_RATIO ||
+    value.r > MAX_SPLIT_RATIO
+  ) {
+    throw new TabLayoutValidationError(`${label}.r must be ${MIN_SPLIT_RATIO}-${MAX_SPLIT_RATIO}`);
+  }
+  const a = parseSplitNode(value.a, `${label}.a`, state, depth + 1);
+  const b = parseSplitNode(value.b, `${label}.b`, state, depth + 1);
+  return { t: 's', d: value.d, r: value.r, a, b };
+}
+
+function parseSplitLayout(value: unknown, repairDuplicates: boolean): SplitLayout {
+  assertRecord(value, 'layout.split');
+  const state = { leaves: 0, seen: new Set<string>(), repairDuplicates };
+  const root = parseSplitNode(value.root, 'layout.split.root', state, 0);
+  if (state.leaves < 2) throw new TabLayoutValidationError('layout.split needs at least two panes');
+  if (value.focus === undefined) return { root };
+  if (!Number.isSafeInteger(value.focus) || (value.focus as number) < 0 || (value.focus as number) >= state.leaves) {
+    throw new TabLayoutValidationError('layout.split.focus must be the index of a pane');
+  }
+  return { root, focus: value.focus as number };
+}
+
+/** Session ids held by the panes of a split, in depth-first order (null panes skipped). */
+export function splitSessionIds(split: SplitLayout | undefined): string[] {
+  const ids: string[] = [];
+  const walk = (node: SplitNode): void => {
+    if (node.t === 'p') {
+      if (node.s !== null) ids.push(node.s);
+      return;
+    }
+    walk(node.a);
+    walk(node.b);
+  };
+  if (split) walk(split.root);
+  return ids;
+}
+
+/**
+ * Empty the panes whose session `isGone` calls gone. A pane stays (the restore shows it empty);
+ * a split left with no session at all is dropped, since there is nothing to restore.
+ */
+function pruneSplitSessions(
+  split: SplitLayout | undefined,
+  isGone: (sessionId: string) => boolean
+): SplitLayout | undefined {
+  if (!split) return undefined;
+  const walk = (node: SplitNode): SplitNode =>
+    node.t === 'p'
+      ? node.s !== null && isGone(node.s)
+        ? { t: 'p', s: null }
+        : { ...node }
+      : { ...node, a: walk(node.a), b: walk(node.b) };
+  const next: SplitLayout = { ...split, root: walk(split.root) };
+  return splitSessionIds(next).length === 0 ? undefined : next;
+}
+
 function parseTabLayout(input: unknown, repairDuplicates: boolean): TabLayout {
   assertRecord(input, 'layout');
   if (!Number.isSafeInteger(input.version) || (input.version as number) < 0) {
@@ -147,12 +266,14 @@ function parseTabLayout(input: unknown, repairDuplicates: boolean): TabLayout {
   if (refCount > MAX_TAB_REFS) {
     throw new TabLayoutValidationError(`layout cannot contain more than ${MAX_TAB_REFS} refs`);
   }
-  return {
+  const parsed: TabLayout = {
     version: input.version as number,
     groups,
     ungrouped: input.ungrouped.map((entry, index) => parseStoredRef(entry, `layout.ungrouped[${index}]`)),
     updatedAt,
   };
+  if (input.split !== undefined) parsed.split = parseSplitLayout(input.split, repairDuplicates);
+  return parsed;
 }
 
 /** Validate and defensively clone a layout. Group names are normalized by trimming. */
@@ -238,6 +359,16 @@ export function normalizeTabLayout(input: TabLayout, metadata: readonly TabRefMe
   }
 
   let working = withContainers(layout, dedupedByContainer);
+  // A pane whose session is known to be foreign or invalid is emptied. A session with no metadata
+  // at all is unknown (for example, mid-restoration), so it is kept, same as a tab ref above.
+  if (working.split) {
+    const pruned = pruneSplitSessions(working.split, (id) => {
+      const key = keyOf({ kind: 'session', id });
+      return knownMetadataKeys.has(key) && !metadataByKey.has(key);
+    });
+    if (pruned) working = { ...working, split: pruned };
+    else delete working.split;
+  }
   const located = locations(working);
   const refByKey = new Map(located.map((item) => [keyOf(item.ref), item.ref]));
   const sessionById = new Map(valid.filter((item) => item.kind === 'session').map((item) => [item.id, item]));
@@ -512,11 +643,15 @@ export function materializeOrphans(
           ? { ...ref, placement: 'manual' }
           : { ...ref }
       );
-  return {
+  const result: TabLayout = {
     ...layout,
     groups: layout.groups.map((group) => ({ ...group, refs: transform(group.refs) })),
     ungrouped: transform(layout.ungrouped),
   };
+  const split = pruneSplitSessions(layout.split, (id) => removed.has(id));
+  if (split) result.split = split;
+  else delete result.split;
+  return result;
 }
 
 /** Session-only compatibility order; collapse and webviews do not affect it. */

@@ -1,0 +1,4 @@
+dev-config.json
+shell.log
+src-tauri/gen/
+src-tauri/target/

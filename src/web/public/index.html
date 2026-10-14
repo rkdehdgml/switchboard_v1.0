@@ -50,10 +50,14 @@
   <script>if(window.innerWidth<768||(('ontouchstart' in window||navigator.maxTouchPoints>0)&&window.innerWidth<1024))document.documentElement.classList.add('mobile-init');</script>
   <!-- Synchronous skin selection — runs before first paint to prevent theme flash -->
   <script>try{var s=localStorage.getItem('codeman:skin'),a=['og','daylight-green','daylight-blue','paper-gray','solarized-light','catppuccin-latte','rose-pine-dawn'];if(a.indexOf(s)<0)s='daylight-blue';document.documentElement.dataset.skin=s;window.__codemanSkin=s;}catch(e){document.documentElement.dataset.skin='daylight-blue';window.__codemanSkin='daylight-blue';}</script>
+  <!-- Theme pre-paint (T1): the server writes data-theme-mode / data-dark-skin / data-light-skin on <html>.
+       'system' is resolved here with matchMedia, before first paint. Without a saved theme, a legacy
+       localStorage skin (set by the script above) is kept until the client migrates it. -->
+  <script>try{var d=document.documentElement,m=d.dataset.themeMode,k=d.dataset.themeStored,l=localStorage.getItem('codeman:skin');if(m&&(k||!l)){var dk=m==='dark'||(m==='system'&&matchMedia('(prefers-color-scheme: dark)').matches),t=dk?d.dataset.darkSkin:d.dataset.lightSkin;if(t){d.dataset.skin=t;window.__codemanSkin=t;}}}catch(e){}</script>
   <!-- Apply the saved per-device language before first paint. The full translation
        layer loads below; setting lang/dir here prevents an English accessibility
        tree from flashing while the deferred scripts start. -->
-  <script>try{var m=window.innerWidth<768||(('ontouchstart' in window||navigator.maxTouchPoints>0)&&window.innerWidth<1024);var k=m?'codeman-app-settings-mobile':'codeman-app-settings';var l=JSON.parse(localStorage.getItem(k)||'{}').language;l=l==='zh-CN'?'zh-CN':'en';document.documentElement.lang=l;window.__codemanLanguage=l;}catch(e){document.documentElement.lang='en';window.__codemanLanguage='en';}</script>
+  <script>try{var m=window.innerWidth<768||(('ontouchstart' in window||navigator.maxTouchPoints>0)&&window.innerWidth<1024);var k=m?'codeman-app-settings-mobile':'codeman-app-settings';var l=JSON.parse(localStorage.getItem(k)||'{}').language;l=(l==='zh-CN'||l==='en')?l:'ko';document.documentElement.lang=l;window.__codemanLanguage=l;}catch(e){document.documentElement.lang='ko';window.__codemanLanguage='ko';}</script>
   <!-- Apply the saved session-list layout (header strip vs. left sidebar) and the
        sidebar collapse state before first paint, so the loading skeleton and the
        first frame already match. Same per-device settings key as the language
@@ -65,7 +69,7 @@
        app.js, NOT the handheld storage-key test `m`. Use a different predicate
        here and boot will contradict this value, animating the drawer open by
        itself on every load between 768 and 1023px. -->
-  <script>try{var m=window.innerWidth<768||(('ontouchstart' in window||navigator.maxTouchPoints>0)&&window.innerWidth<1024);var k=m?'codeman-app-settings-mobile':'codeman-app-settings';var A=JSON.parse(localStorage.getItem(k)||'{}');var L=A.sessionListLayout;var F=Number(A.sessionSidebarFontSize);var solo=/^\/session\//.test(location.pathname);var C=localStorage.getItem('codeman-sidebar-collapsed');var S=(L==='sidebar'||L==='sidebar-rich')&&!solo;document.documentElement.dataset.sessionList=S?'sidebar':'header';document.documentElement.dataset.sidebarDetail=(S&&L==='sidebar-rich')?'rich':'simple';document.documentElement.dataset.sidebar=(C===null?window.innerWidth<1024:C==='1')?'collapsed':'expanded';var V=A.tabOrientation==='vertical'&&!S&&!solo&&window.innerWidth>=768;document.documentElement.dataset.tabOrientation=V?'vertical':'horizontal';document.documentElement.dataset.tabRailDetail=(A.tabRailDetail==='simple')?'simple':'rich';document.documentElement.dataset.tabRailSort=(A.tabRailSort==='manual')?'manual':'activity';var W=Number(A.tabRailWidth);if(V){if(Number.isInteger(W)&&W>=208&&W<=360)document.documentElement.style.setProperty('--tab-rail-width',W+'px');else if(document.documentElement.dataset.tabRailDetail!=='simple')document.documentElement.style.setProperty('--tab-rail-width','320px');}if(Number.isInteger(F)&&F>=11&&F<=18)document.documentElement.style.setProperty('--session-sidebar-name-font-size',F+'px');}catch(e){document.documentElement.dataset.sessionList='header';document.documentElement.dataset.sidebarDetail='simple';document.documentElement.dataset.sidebar='expanded';document.documentElement.dataset.tabOrientation='horizontal';document.documentElement.dataset.tabRailDetail='rich';document.documentElement.dataset.tabRailSort='activity';}</script>
+  <script>try{var m=window.innerWidth<768||(('ontouchstart' in window||navigator.maxTouchPoints>0)&&window.innerWidth<1024);var k=m?'codeman-app-settings-mobile':'codeman-app-settings';var A=JSON.parse(localStorage.getItem(k)||'{}');var L=A.sessionListLayout;var F=Number(A.sessionSidebarFontSize);var solo=/^\/session\//.test(location.pathname);var C=localStorage.getItem('codeman-sidebar-collapsed');var S=(L==='sidebar'||L==='sidebar-rich')&&!solo;document.documentElement.dataset.sessionList=S?'sidebar':'header';document.documentElement.dataset.sidebarDetail=(S&&L==='sidebar-rich')?'rich':'simple';document.documentElement.dataset.sidebar=(C===null?window.innerWidth<1024:C==='1')?'collapsed':'expanded';var V=!S&&!solo&&window.innerWidth>=768;document.documentElement.dataset.tabOrientation=V?'vertical':'horizontal';var R=localStorage.getItem('codeman-tab-rail-collapsed');document.documentElement.dataset.tabRail=(R===null?window.innerWidth<1024:R==='1')?'collapsed':'expanded';document.documentElement.dataset.tabRailDetail=(A.tabRailDetail==='simple')?'simple':'rich';document.documentElement.dataset.tabRailSort=(A.tabRailSort==='manual')?'manual':'activity';var W=Number(A.tabRailWidth);if(V){if(Number.isInteger(W)&&W>=208&&W<=360)document.documentElement.style.setProperty('--tab-rail-width',W+'px');else if(document.documentElement.dataset.tabRailDetail!=='simple')document.documentElement.style.setProperty('--tab-rail-width','320px');}if(Number.isInteger(F)&&F>=11&&F<=18)document.documentElement.style.setProperty('--session-sidebar-name-font-size',F+'px');}catch(e){document.documentElement.dataset.sessionList='header';document.documentElement.dataset.sidebarDetail='simple';document.documentElement.dataset.sidebar='expanded';document.documentElement.dataset.tabOrientation='horizontal';document.documentElement.dataset.tabRail='expanded';document.documentElement.dataset.tabRailDetail='rich';document.documentElement.dataset.tabRailSort='activity';}</script>
   <!-- Inline critical CSS for instant skeleton paint (before styles.css loads) -->
   <style>
     .loading-skeleton{display:flex;flex-direction:column;height:100vh;height:100dvh;background:var(--bg-dark,#11151c)}
@@ -75,7 +79,7 @@
     .skeleton-tab{width:80px;height:24px;background:var(--control-bg,rgba(255,255,255,0.04));border-radius:6px}
     .skeleton-body{flex:1;display:flex;min-height:0}
     .skeleton-sidebar{display:none;width:44px;flex:0 0 44px;background:var(--glass-bg,rgba(31,38,48,0.85));border-right:1px solid var(--glass-border,rgba(255,255,255,0.08))}
-    .skeleton-terminal{flex:1;background:var(--term-bg,#161b23)}
+    .skeleton-terminal{flex:1;background:var(--term-bg,#0c0d10)}
     .skeleton-toolbar{height:42px;background:var(--glass-bg,rgba(31,38,48,0.85));border-top:1px solid var(--glass-border,rgba(255,255,255,0.08))}
     /* Sidebar layout: the strip skeleton would flash a grey pill where no strip
        will be, so swap it for a rail matching --sidebar-width-collapsed. */
@@ -114,7 +118,7 @@
     <header class="header">
       <div class="header-brand">
         <span class="logo" onclick="app.goHome()" title="Go to main page"
-          ><span class="logo-text">Codeman</span><span class="logo-compact" aria-hidden="true">C</span></span
+          ><span class="logo-text">Codeman</span><span class="logo-compact" aria-hidden="true">S</span></span
         >
         <!-- Collapse/expand the session sidebar. Lives in .header-brand, NOT in
              #headerRight: test/mobile-header-buttons-policy.test.ts only enumerates
@@ -129,6 +133,11 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg>
         </button>
       </div>
+
+      <!-- Menu bar (T2). Inside the header, never a new row. The five buttons are built
+           by menu-bar.js; their dropdowns hang off <body> because .header clips paint.
+           Desktop only (styles.css hides it under 768px). -->
+      <nav class="header-menu" id="headerMenu" aria-label="Main menu"></nav>
 
       <!-- Session Tabs. In sidebar layout THIS VERY #sessionTabs element is
            re-parented into #sessionSidebarList by applySessionListLayout() and
@@ -154,11 +163,6 @@
         <div class="connection-indicator" id="connectionIndicator" style="display: none;">
           <span class="connection-dot" id="connectionDot"></span>
           <span class="connection-text" id="connectionText"></span>
-        </div>
-        <div class="header-font-controls">
-          <button class="btn-icon-header btn-sm" onclick="app.decreaseFontSize()" title="Decrease font (Ctrl+-)" aria-label="Decrease font size">A-</button>
-          <span class="font-size-display" id="fontSizeDisplay" aria-label="Current font size">14</span>
-          <button class="btn-icon-header btn-sm" onclick="app.increaseFontSize()" title="Increase font (Ctrl++)" aria-label="Increase font size">A+</button>
         </div>
         <div class="header-system-stats" id="headerSystemStats" title="System resource usage">
           <div class="stat-item">
@@ -193,6 +197,7 @@
         <button class="btn-icon-header btn-multimonitor btn-multimonitor--hidden" onclick="app.launchMultiMonitor()" title="Open Codeman across all displays" aria-label="Open Codeman across all displays"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="13" height="9" rx="1.5"/><rect x="11" y="9" width="11" height="8" rx="1.5"/></svg></button>
         <button class="btn-icon-header btn-split btn-split--hidden" onclick="app.openSplitPicker(event)" title="Split: open a second session beside this one" aria-label="Split: open a second session beside this one" aria-pressed="false"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg></button>
         <button class="btn-icon-header btn-ultracode-agents btn-ultracode-agents--hidden" onclick="app.toggleUltracodeAgentsPanel()" title="Ultracode / Workflow agents" aria-label="Open ultracode workflow agents"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="12" r="2.5"/><path d="M8.2 7.2 15.6 11M8.2 16.8 15.6 13"/></svg></button>
+        <button class="btn-header-palette" id="headerPaletteBtn" onclick="app.openCommandPalette()" title="Command palette" aria-label="Open command palette" hidden><span>Search</span><kbd></kbd></button>
         <div class="header-plan-usage header-plan-usage--hidden" id="planUsageChip" title="Claude and Codex plan usage limits">—</div>
         <button class="btn-icon-header btn-notifications" onclick="app.toggleNotifications()" title="Notifications" aria-label="Toggle notifications" style="display:none;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
@@ -389,6 +394,13 @@
 
     <!-- Main Terminal Area -->
     <main class="main">
+      <!-- The rail is always there on desktop; this arrow is the only control. It sits on the rail's
+           right edge, and on the window's left edge when the rail is collapsed (rail width 0), so
+           a collapsed rail leaves exactly one thing on screen. -->
+      <button type="button" class="tab-rail-toggle" id="tabRailToggle" aria-controls="tabRail" aria-expanded="true"
+        aria-label="Collapse session list" title="Collapse session list" onclick="app.toggleTabRail()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+      </button>
       <aside class="tab-rail" id="tabRail" aria-label="Session navigation">
         <div
           id="tabRailResizeHandle"
@@ -401,6 +413,28 @@
           aria-valuenow="256"
           tabindex="0"
         ></div>
+        <!-- T3: search stays pinned above the list, "New session" below it. applySessionListLayout()
+             moves #sessionTabs in BETWEEN them (insertBefore .tab-rail-foot), so only the list scrolls. -->
+        <div class="tab-rail-search">
+          <input type="search" id="tabRailFilter" class="tab-rail-filter"
+            placeholder="Search sessions" aria-label="Search sessions"
+            autocomplete="off" spellcheck="false"
+            oninput="app.applySidebarFilter(this.value)">
+        </div>
+        <div class="tab-rail-foot">
+          <button type="button" class="tab-rail-new" onclick="app.run()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            <span>New session</span>
+          </button>
+          <button type="button" class="tab-rail-split-btn" data-dir="row" aria-pressed="false" aria-disabled="false"
+            title="Split side by side" aria-label="Split side by side" onclick="app.onSplitButton(event, 'row')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/></svg>
+          </button>
+          <button type="button" class="tab-rail-split-btn" data-dir="col" aria-pressed="false" aria-disabled="false"
+            title="Split top and bottom" aria-label="Split top and bottom" onclick="app.onSplitButton(event, 'col')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 12h18"/></svg>
+          </button>
+        </div>
       </aside>
 
       <!-- Collapsible session sidebar (opt-in layout). Deliberately EMPTY in
@@ -439,6 +473,9 @@
            terminal while a web tab is active. Frames stay mounted while hidden so
            switching tabs does not reload (and re-authenticate) a dashboard. -->
       <div class="webview-layer" id="webviewLayer"></div>
+
+      <!-- Home tab (Switchboard T4): usage dashboard, shown in place of the terminal. -->
+      <div class="home-layer" id="homeLayer" role="region" aria-label="Usage"></div>
 
       <!-- Welcome Overlay (shown when no session active) -->
       <div class="welcome-overlay" id="welcomeOverlay">
@@ -771,6 +808,26 @@
         <span class="version-display" id="versionDisplay" title="Codeman version">v0.0.0</span>
       </div>
     </footer>
+
+    <!-- Kill all sessions: confirm (menu bar, T2). A real dialog instead of window.confirm,
+         which freezes the page and cannot be styled or translated. -->
+    <div class="modal" id="killAllModal">
+      <div class="modal-backdrop" onclick="app.closeKillAllConfirm()"></div>
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="killAllTitle">
+        <div class="modal-header">
+          <h3 id="killAllTitle">Kill all sessions?</h3>
+          <button class="modal-close" onclick="app.closeKillAllConfirm()" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p><strong id="killAllCount" data-i18n-skip>0</strong> <span>session(s) will end</span></p>
+          <p>This ends every running session and its terminal. It cannot be undone.</p>
+          <div class="modal-actions">
+            <button type="button" class="btn-toolbar" id="killAllCancel" onclick="app.closeKillAllConfirm()">Cancel</button>
+            <button type="button" class="btn-toolbar btn-danger" onclick="app.confirmKillAll()">Kill all</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Help Modal -->
     <div class="modal" id="helpModal">
@@ -1615,6 +1672,10 @@
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18 4.5 4.5 0 0 0 0-9 4.5 4.5 0 0 1 0-9z"/></svg>
                 <span>Appearance</span>
               </button>
+              <button type="button" class="set-rail-item" data-section="settings-workfolders">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+                <span>Work folders</span>
+              </button>
               <button type="button" class="set-rail-item" data-section="settings-models">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg>
                 <span>Models</span>
@@ -1747,6 +1808,17 @@
               <div class="set-group">
                 <div class="set-group-head"><h4>Font</h4><span class="set-scope">device</span></div>
                 <div class="set-group-body">
+                  <div class="set-row" data-search="terminal font size bigger smaller increase decrease zoom">
+                    <div class="set-row-text">
+                      <span class="set-row-label">Terminal font size</span>
+                      <span class="set-row-desc">Applies immediately. Ctrl+Plus and Ctrl+Minus do the same from the keyboard.</span>
+                    </div>
+                    <div class="set-stepper" role="group" aria-label="Terminal font size">
+                      <button type="button" class="btn-toolbar btn-sm" onclick="app.decreaseFontSize()" aria-label="Decrease font size">A-</button>
+                      <span class="set-stepper-value" id="fontSizeDisplay" aria-live="polite">14</span>
+                      <button type="button" class="btn-toolbar btn-sm" onclick="app.increaseFontSize()" aria-label="Increase font size">A+</button>
+                    </div>
+                  </div>
                   <div class="set-row has-field" data-search="terminal font family nerd custom typeface">
                     <div class="set-row-text">
                       <span class="set-row-label">Terminal font</span>
@@ -1866,7 +1938,6 @@
                 <p class="set-group-hint">Tap to show a control in the header. Multi-monitor is the one entry here that syncs across devices.</p>
                 <div class="set-group-body">
                   <div class="set-chips" data-search="header buttons plan usage font stats lifecycle response file viewer attachments monitor session away cron redraw">
-                    <label class="set-chip" data-preview="header" data-preview-order="1" data-preview-text="A+"><input type="checkbox" id="appSettingsShowFontControls"><svg class="set-chip-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20 10 5l6 15"/><path d="M6.5 15h7"/><path d="M18 12h4M20 10v4"/></svg><span>Font Size</span></label>
                     <label class="set-chip" data-preview="header" data-preview-order="2" data-preview-text="CPU 12%"><input type="checkbox" id="appSettingsShowSystemStats" checked><svg class="set-chip-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l2.5-7 4 14L16 12h5"/></svg><span>System Stats</span></label>
                     <label class="set-chip" data-preview="header" data-preview-order="3"><input type="checkbox" id="appSettingsShowRedrawButton"><svg class="set-chip-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg><span>Redraw Terminal</span></label>
                     <label class="set-chip" data-preview="header" data-preview-order="4"><input type="checkbox" id="appSettingsShowResponseViewer"><svg class="set-chip-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><span>Response Viewer</span></label>
@@ -1948,24 +2019,28 @@
               <div class="set-group">
                 <div class="set-group-head"><h4>Theme</h4><span class="set-scope">device</span></div>
                 <div class="set-group-body">
-                  <div class="set-row has-field" data-search="skin theme palette colors dark light">
-                    <div class="set-row-text">
-                      <span class="set-row-label">Skin</span>
-                      <span class="set-row-desc">Palette for the terminal and the UI.</span>
+                  <div class="set-row theme-row" data-search="skin theme palette colors dark light system">
+                    <div class="theme-controls" id="appSettingsTheme">
+                      <fieldset class="theme-fieldset">
+                        <legend>Theme</legend>
+                        <div class="theme-seg" id="appSettingsThemeMode">
+                          <button type="button" data-mode="dark" aria-pressed="false">Dark</button>
+                          <button type="button" data-mode="light" aria-pressed="false">Light</button>
+                          <button type="button" data-mode="system" aria-pressed="false">System</button>
+                        </div>
+                        <span class="theme-status" id="appSettingsThemeStatus" role="status"></span>
+                      </fieldset>
+                      <fieldset class="theme-fieldset" id="appSettingsDarkSkins">
+                        <legend>Skin when dark</legend>
+                        <div class="theme-cards" data-tone="dark"></div>
+                      </fieldset>
+                      <fieldset class="theme-fieldset" id="appSettingsLightSkins">
+                        <legend>Skin when light</legend>
+                        <div class="theme-cards" data-tone="light"></div>
+                      </fieldset>
+                      <p class="set-row-desc">Terminal colors follow the skin.</p>
+                      <p class="set-row-desc">Changes apply immediately and are saved in this PC's Codeman settings.</p>
                     </div>
-                    <select id="appSettingsSkin" class="set-select">
-                      <optgroup label="Light">
-                        <option value="paper-gray">Paper Gray</option>
-                        <option value="solarized-light">Solarized Light</option>
-                        <option value="catppuccin-latte">Catppuccin Latte</option>
-                        <option value="rose-pine-dawn">Rosé Pine Dawn</option>
-                      </optgroup>
-                      <optgroup label="Dark">
-                        <option value="daylight-blue">Daylight Blue</option>
-                        <option value="daylight-green">Daylight Green</option>
-                        <option value="og">OG Codeman</option>
-                      </optgroup>
-                    </select>
                   </div>
                   <div class="set-row has-field" data-search="entrance animations motion tabs windows">
                     <div class="set-row-text">
@@ -2003,6 +2078,7 @@
                     <select id="appSettingsLanguage" class="set-select">
                       <option value="en">English</option>
                       <option value="zh-CN">简体中文</option>
+                      <option value="ko">한국어</option>
                     </select>
                   </div>
                 </div>
@@ -2011,16 +2087,6 @@
               <div class="set-group">
                 <div class="set-group-head"><h4>Tabs</h4><span class="set-scope">device</span></div>
                 <div class="set-group-body">
-                  <div class="set-row has-field" data-search="tab orientation horizontal vertical side rail">
-                    <div class="set-row-text">
-                      <span class="set-row-label">Tab Orientation</span>
-                      <span class="set-row-desc">Keep tabs in the header or place them beside the terminal. Phones stay horizontal.</span>
-                    </div>
-                    <select id="appSettingsTabOrientation" class="set-select">
-                      <option value="horizontal">Horizontal (top)</option>
-                      <option value="vertical">Vertical (side rail)</option>
-                    </select>
-                  </div>
                   <div class="set-row has-field" data-search="tab rail detail rows created working idle status pill simple">
                     <div class="set-row-text">
                       <span class="set-row-label">Vertical Rail Rows</span>
@@ -2112,6 +2178,22 @@
                     </div>
                     <label class="switch switch-sm"><input type="checkbox" id="appSettingsMobileOverview" checked><span class="slider"></span></label>
                   </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- ══ Work folders (Switchboard T6) ═════════════════════════════
+                 Default location for NEW cases + the roots searched for existing projects.
+                 Drawn by work-folders.js into #workFoldersRoot each time Settings opens. -->
+            <section class="set-section" id="settings-workfolders" data-label="Work folders">
+              <div class="set-section-head">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+                <h2>Work folders</h2>
+              </div>
+              <p class="set-section-blurb">Where new cases are created, and which folders are searched for projects you already have.</p>
+              <div class="set-group">
+                <div class="set-group-body">
+                  <div id="workFoldersRoot" class="wf-root"></div>
                 </div>
               </div>
             </section>
@@ -2649,6 +2731,7 @@
                       <option value="fr">French</option>
                       <option value="de">German</option>
                       <option value="ja">Japanese</option>
+                      <option value="ko">Korean</option>
                       <option value="multi">Auto-detect (multi)</option>
                     </select>
                   </div>
@@ -2994,6 +3077,7 @@
                 <button type="button" class="btn path-input-browse" onclick="app.openLinkCasePathPicker()">Browse&hellip;</button>
               </div>
               <span class="form-hint">Choose an existing folder from this computer or enter its absolute path</span>
+              <div id="linkCasePathPair" class="folder-pair" hidden></div>
             </div>
           </div>
           <!-- Remote Tab -->
@@ -3729,6 +3813,7 @@
   </div>
 
   <script defer src="constants.js"></script>
+  <script defer src="i18n-ko.js"></script>
   <script defer src="i18n.js"></script>
   <script defer src="mobile-handlers.js"></script>
   <script defer src="voice-input.js"></script>
@@ -3748,15 +3833,21 @@
   <script defer src="orchestrator-panel.js"></script>
   <script defer src="cron-ui.js"></script>
   <script defer src="settings-ui.js"></script>
+  <script defer src="theme-ui.js"></script>
   <script defer src="panels-ui.js"></script>
   <script defer src="readmymind-ui.js"></script>
   <script defer src="ultracode-panel.js"></script>
   <script defer src="approvals-ui.js"></script>
   <script defer src="reboot-restore-ui.js"></script>
   <script defer src="admin-ui.js"></script>
+  <script defer src="menu-bar.js"></script>
+  <script defer src="native-folder.js"></script>
+  <script defer src="work-folders.js"></script>
+  <script defer src="project-switch.js"></script>
   <script defer src="session-ui.js"></script>
   <script defer src="host-wake-ui.js"></script>
   <script defer src="webview-tabs.js"></script>
+  <script defer src="home-dashboard.js"></script>
   <script defer src="mobile-overview.js"></script>
   <script defer src="home-sessions.js"></script>
   <script defer src="entrance-animations.js"></script>

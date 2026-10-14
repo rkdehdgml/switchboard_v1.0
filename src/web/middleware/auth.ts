@@ -32,6 +32,14 @@ import {
   LOST_FRAME_PAGE_CSP,
 } from '../webview-proxy.js';
 import { ApiErrorCode, createErrorResponse, type AuthUser } from '../../types.js';
+import {
+  DESKTOP_COOKIE_NAME,
+  DESKTOP_ENTER_PATH,
+  DESKTOP_IDENTITY_HEADER,
+  desktopTokenMatches,
+  getDesktopMode,
+  type DesktopConfig,
+} from '../desktop-mode.js';
 
 // Request-scoped identity (multi-user). Single-user leaves it undefined and the
 // ownership helpers default to a synthetic admin (see route-helpers).
@@ -294,6 +302,17 @@ export function registerAuthMiddleware(app: FastifyInstance, https: boolean, bas
   // undefined; the ownership helpers then default to a synthetic admin).
   if (!app.hasRequestDecorator('authUser')) app.decorateRequest('authUser', undefined);
 
+  // Desktop shell (T9-1): the per-launch token replaces Basic Auth entirely.
+  const desktop = getDesktopMode();
+  if (desktop) {
+    state.hookSecretFailures = new StaleExpirationMap<string, number>({
+      ttlMs: AUTH_FAILURE_WINDOW_MS,
+      refreshOnGet: false,
+    });
+    registerDesktopAuthHook(app, desktop, state.hookSecretFailures, basePath);
+    return state;
+  }
+
   const multiUser = isMultiUserMode();
   const authPassword = process.env.CODEMAN_PASSWORD;
 
@@ -440,6 +459,69 @@ export function registerAuthMiddleware(app: FastifyInstance, https: boolean, bas
   });
 
   return state;
+}
+
+/**
+ * Desktop-mode auth (T9-1): one onRequest hook for HTTP, SSE and the WebSocket upgrade.
+ * A request passes with the launch token in the `sb_desktop` cookie (what the window
+ * holds after `/__sb/enter`) or in `Authorization: Bearer` (the shell's own health
+ * probe); everything else is 401. The Claude hook routes keep their loopback +
+ * hook-secret bypass, and a valid web-tab capability still authenticates its own path.
+ * ponytail: no per-IP failure counter, a 256-bit token cannot be guessed.
+ */
+function registerDesktopAuthHook(
+  app: FastifyInstance,
+  desktop: DesktopConfig,
+  hookSecretFailures: StaleExpirationMap<string, number>,
+  basePath = ''
+): void {
+  app.addHook('onRequest', (req, reply, done) => {
+    const bypass = checkHookSecretBypass(req, reply, hookSecretFailures);
+    if (bypass === 'bypass') {
+      done();
+      return;
+    }
+    if (bypass === 'rejected') return;
+
+    const [path, query = ''] = (req.url ?? '').split('?', 2);
+
+    // The window's first request: trade `?t=<token>` for the cookie, then land on `/` so the
+    // token never stays in the address bar or the history. ⚠️ Not a 302: the shell opens this URL
+    // from its own app page (another site), and a redirect chain inherits that initiator, so
+    // the SameSite=Strict cookie it just received would not be sent on the redirect target.
+    // A meta refresh is a navigation started BY this same-site page, which sends it.
+    if (path === DESKTOP_ENTER_PATH && req.method === 'GET') {
+      const presented = new URLSearchParams(query).get('t');
+      if (!desktopTokenMatches(presented, desktop.token)) {
+        reply.header(DESKTOP_IDENTITY_HEADER, '1').code(401).send('Unauthorized');
+        return;
+      }
+      reply
+        .setCookie(DESKTOP_COOKIE_NAME, desktop.token, { httpOnly: true, secure: false, sameSite: 'strict', path: '/' })
+        .header('Cache-Control', 'no-store')
+        .header('Referrer-Policy', 'no-referrer')
+        .type('text/html; charset=utf-8')
+        .send(
+          `<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=${basePath}/"><title>Switchboard</title>`
+        );
+      return;
+    }
+
+    if (hasValidWebviewCapability(req, basePath)) {
+      done();
+      return;
+    }
+
+    const bearer = /^Bearer (.+)$/.exec(req.headers.authorization ?? '')?.[1];
+    if (
+      desktopTokenMatches(req.cookies[DESKTOP_COOKIE_NAME], desktop.token) ||
+      desktopTokenMatches(bearer, desktop.token)
+    ) {
+      done();
+      return;
+    }
+    reply.header(DESKTOP_IDENTITY_HEADER, '1').code(401).send('Unauthorized');
+  });
 }
 
 /**
@@ -685,7 +767,9 @@ export function registerSecurityHeaders(app: FastifyInstance, https: boolean, ba
     }
 
     // CORS: restrict to same-origin (localhost) only
-    const origin = req.headers.origin;
+    // Desktop mode sends none: the window is same-origin, and reflecting a port-less
+    // localhost match would let any local web app read responses (same-site to us).
+    const origin = getDesktopMode() ? undefined : req.headers.origin;
     if (origin) {
       try {
         const url = new URL(origin);

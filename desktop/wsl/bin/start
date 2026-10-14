@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# Switchboard server launcher (runs inside WSL, foreground, `exec`s node so the pid is the server's).
+# Usage: start --host 127.0.0.1 --port <port>      The per-launch token arrives on STDIN (first line),
+# never on the command line: the desktop shell pipes it, the server reads and discards it.
+#
+# Layout (installed): ~/.switchboard/{bin/start,bin/stop,node/bin/node,server/dist/index.js,data/,logs/,run/}
+# Dev overrides: SWITCHBOARD_HOME, SWITCHBOARD_APP_DIR (repo checkout), SWITCHBOARD_DEV=1 (run src via tsx).
+set -euo pipefail
+
+SB_HOME="${SWITCHBOARD_HOME:-$HOME/.switchboard}"
+SB_HOME="${SB_HOME/#\~/$HOME}"   # allow a leading ~ (the Windows side cannot expand it)
+APP_DIR="${SWITCHBOARD_APP_DIR:-$SB_HOME/server}"
+RUN_DIR="$SB_HOME/run"
+LOG_DIR="$SB_HOME/logs"
+
+host=127.0.0.1
+port=
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --host) host="${2:-}"; shift 2 ;;
+    --port) port="${2:-}"; shift 2 ;;
+    *) echo "start: unknown argument: $1" >&2; exit 64 ;;
+  esac
+done
+[ "$host" = "127.0.0.1" ] || { echo "start: only 127.0.0.1 is allowed" >&2; exit 64; }
+case "$port" in ''|*[!0-9]*) echo "start: --port must be a number" >&2; exit 64 ;; esac
+[ "$port" -ge 1 ] && [ "$port" -le 65535 ] || { echo "start: port out of range" >&2; exit 64; }
+
+mkdir -p "$RUN_DIR" "$LOG_DIR" "$SB_HOME/data"
+chmod 700 "$SB_HOME" "$RUN_DIR" 2>/dev/null || true
+
+# Own data dir and tmux socket, never ~/.codeman or `tmux -L codeman`: this app must not adopt
+# another Codeman's sessions. CODEMAN_INSTANCE (if the caller set one) already isolates both.
+if [ -z "${CODEMAN_INSTANCE:-}" ]; then
+  export CODEMAN_DATA_DIR="${CODEMAN_DATA_DIR:-$SB_HOME/data}"
+  export CODEMAN_TMUX_SOCKET="${CODEMAN_TMUX_SOCKET:-switchboard}"
+fi
+
+NODE="$SB_HOME/node/bin/node"
+[ -x "$NODE" ] || NODE="$(command -v node || true)"
+[ -n "$NODE" ] || { echo "start: node not found (looked in $SB_HOME/node and PATH)" >&2; exit 69; }
+
+if [ "${SWITCHBOARD_DEV:-}" = "1" ] || [ ! -f "$APP_DIR/dist/index.js" ]; then
+  [ -x "$APP_DIR/node_modules/.bin/tsx" ] || { echo "start: no build at $APP_DIR/dist and no tsx" >&2; exit 69; }
+  ENTRY=("$NODE" "$APP_DIR/node_modules/.bin/tsx" "$APP_DIR/src/index.ts")
+else
+  ENTRY=("$NODE" "$APP_DIR/dist/index.js")
+fi
+
+# A previous run's pidfile must not outlive its process: refuse to start twice.
+PIDFILE="$RUN_DIR/server.pid"
+if [ -f "$PIDFILE" ]; then
+  old="$(cat "$PIDFILE" 2>/dev/null || true)"
+  if [ -n "$old" ] && [ -r "/proc/$old/cmdline" ] && tr '\0' ' ' < "/proc/$old/cmdline" | grep -q -- '--desktop'; then
+    echo "start: a Switchboard server is already running (pid $old)" >&2
+    exit 75
+  fi
+fi
+
+echo $$ > "$PIDFILE"
+cd "$APP_DIR"
+# stdin stays attached (token); logs go to a file, rotated by size on each start.
+if [ -f "$LOG_DIR/server.log" ] && [ "$(stat -c %s "$LOG_DIR/server.log")" -gt 5242880 ]; then
+  mv -f "$LOG_DIR/server.log" "$LOG_DIR/server.log.1"
+fi
+exec "${ENTRY[@]}" web --desktop --host "$host" --port "$port" >> "$LOG_DIR/server.log" 2>&1

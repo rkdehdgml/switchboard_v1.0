@@ -16,7 +16,9 @@
  * feature), so the "stays attachable" cases matter just as much: over-blocking
  * breaks the publish skill and the review-card loop.
  */
-import { homedir } from 'node:os';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { isSensitivePath } from '../src/web/sensitive-path.js';
 
@@ -88,6 +90,37 @@ describe('isSensitivePath', () => {
       ['codeman push keys (VAPID private)', `${HOME}/.codeman/push-keys.json`],
       ['codeman intent profiles', `${HOME}/.codeman/intents.json`],
       ['codeman intents on a named instance', `${HOME}/.codeman-beta/intents.json`],
+
+      // Windows profile credentials, reachable through /mnt/<drive> (Switchboard T7).
+      [
+        'windows AppData (browser profiles, tokens)',
+        '/mnt/c/Users/bob/AppData/Local/Google/Chrome/User Data/Default/Cookies',
+      ],
+      ['windows AppData root itself', '/mnt/c/Users/bob/AppData'],
+      ['windows AppData on another drive', '/mnt/d/Users/bob/AppData/Roaming/x.json'],
+      ['windows AppData, NTFS case-insensitive spelling', '/mnt/c/users/BOB/appdata/Roaming/x'],
+      ['windows .ssh', '/mnt/c/Users/bob/.ssh/id_ed25519'],
+      ['windows .aws (whole tree, not only credentials)', '/mnt/c/Users/bob/.aws/cli/cache/token.json'],
+      ['windows .azure', '/mnt/c/Users/bob/.azure/msal_token_cache.json'],
+      ['windows .kube', '/mnt/c/Users/bob/.kube/cache/x'],
+      ['windows .gnupg', '/mnt/c/Users/bob/.gnupg/trustdb.gpg'],
+      ['windows .docker (not only config.json)', '/mnt/c/Users/bob/.docker/contexts/x'],
+      ['windows gcloud config', '/mnt/c/Users/bob/.config/gcloud/credentials.db'],
+      ['registry hive', '/mnt/c/Users/bob/NTUSER.DAT'],
+      ['registry hive transaction log', '/mnt/c/Users/bob/ntuser.dat.LOG1'],
+      ['windows directory', '/mnt/c/Windows/System32/config/SAM'],
+      ['windows directory itself', '/mnt/c/Windows'],
+      ['program files', '/mnt/c/Program Files/App/x.dll'],
+      ['program files (x86)', '/mnt/c/Program Files (x86)'],
+      ['program data', '/mnt/c/ProgramData/Microsoft/Crypto'],
+      ['the system drive root', '/mnt/c'],
+      ['the system drive root with a slash', '/mnt/c/'],
+      ['keepass vault', '/srv/share/passwords.kdbx'],
+      ['pem key/cert', '/srv/app/server.PEM'],
+      ['pfx bundle', '/mnt/d/dev/cert.pfx'],
+      ['id_rsa outside .ssh', '/srv/backup/id_rsa'],
+      ['id_rsa with a suffix', '/srv/backup/id_rsa.old'],
+      ['id_ed25519 outside .ssh', '/srv/backup/id_ed25519'],
     ];
 
     it.each(blocked)('blocks the %s', (_label, path) => {
@@ -110,6 +143,18 @@ describe('isSensitivePath', () => {
       // with a blocked segment must not be caught.
       ['an unrelated sshd notes file', '/srv/notes/.sshd-setup.md'],
       ['a file named credentials-policy.md', '/srv/app/credentials-policy.md'],
+      // Segment-aware, drive-aware, and end-anchored: the Windows entries must not
+      // catch ordinary project files.
+      ['a project folder named AppData-notes', '/mnt/d/Users/bob/AppData-notes/readme.md'],
+      ['AppData NOT under Users/<name>', '/mnt/d/dev/app/AppData/x.ts'],
+      ['a folder named Windows on D:', '/mnt/d/Windows/project/x.ts'],
+      ['a Windows-looking name under another path', '/srv/Windows/x'],
+      ['ordinary documents on C:', '/mnt/c/Users/bob/Documents/report.docx'],
+      ['a drive root other than C', '/mnt/d'],
+      ['a deeper folder on C that is not system', '/mnt/c/dev/project/x.ts'],
+      ['pem as a middle extension', '/srv/app/key.pem.md'],
+      ['a file merely named pem', '/srv/app/pem'],
+      ['a file merely containing id_rsa', '/srv/notes/how-id_rsa-works.md'],
     ];
 
     it.each(allowed)('allows %s', (_label, path) => {
@@ -151,6 +196,28 @@ describe('isSensitivePath', () => {
       ['a .claude.json under some OTHER home', `${HOME}/.claude.json`],
     ])('keeps %s servable', (_label, path) => {
       expect(isSensitivePath(path)).toBe(false);
+    });
+  });
+
+  describe('Windows entries and symlinks (callers realpath first)', () => {
+    // The pattern list is pure string matching, so a link is only caught when the
+    // CALLER resolves it. Prove that contract on real links for the entries that are
+    // not anchored under /mnt (those cannot be created in a test sandbox).
+    it('catches a link that points at key material once it is resolved', () => {
+      const dir = mkdtempSync(join(tmpdir(), 'sbsens-'));
+      try {
+        mkdirSync(join(dir, 'vault'));
+        const targets = ['login.kdbx', 'server.pem', 'bundle.pfx', 'id_rsa'];
+        for (const name of targets) {
+          writeFileSync(join(dir, 'vault', name), 'x');
+          const link = join(dir, `innocent-${name.replace(/\W/g, '-')}.txt`);
+          symlinkSync(join(dir, 'vault', name), link);
+          expect(isSensitivePath(link), `unresolved ${name}`).toBe(false);
+          expect(isSensitivePath(realpathSync(link)), `resolved ${name}`).toBe(true);
+        }
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
     });
   });
 });

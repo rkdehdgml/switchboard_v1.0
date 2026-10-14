@@ -1,0 +1,10 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-window",
+  "description": "The Switchboard window may recolor its own title bar and open the native folder dialog (dialog `open`, nothing else). The page it shows is the local server, so this is the whole IPC surface, and it is granted to 127.0.0.1 only. The server re-validates every path the dialog returns (T7).",
+  "windows": ["main"],
+  "remote": {
+    "urls": ["http://127.0.0.1:*"]
+  },
+  "permissions": ["core:window:allow-set-theme", "dialog:allow-open"]
+}

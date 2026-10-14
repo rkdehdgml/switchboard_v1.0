@@ -388,6 +388,7 @@ Object.assign(CodemanApp.prototype, {
     }
     this._mountWebviewFrame(id, src, data.webview || webview, { navigate: path !== null });
     this.activeWebviewId = id;
+    this._hideHome?.();
     this.hideWelcome?.();
     document.querySelector('.main')?.classList.add('webview-active');
     this.renderSessionTabs();

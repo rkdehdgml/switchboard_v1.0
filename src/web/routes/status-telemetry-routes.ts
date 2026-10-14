@@ -23,7 +23,7 @@ import {
   telemetrySignature,
   type RawStatuslinePayload,
 } from '../../usage-telemetry.js';
-import { SessionStatusTelemetry } from '../sse-events.js';
+import { SessionStatusTelemetry, SessionUpdated } from '../sse-events.js';
 import { setLatestPlanUsage } from '../plan-usage-latest.js';
 import type { SessionPort, EventPort } from '../ports/index.js';
 
@@ -45,6 +45,15 @@ export function registerStatusTelemetryRoutes(app: FastifyInstance, ctx: Session
     }
 
     const payload = data as RawStatuslinePayload | undefined;
+
+    // Per-session cost (independent of plan limits: non-subscribers have no rate_limits but
+    // still report cost). Interactive sessions never fill it otherwise, and both the dashboard
+    // and the rail's second line read it.
+    const session = ctx.sessions.get(sessionId);
+    const cost = payload?.cost?.total_cost_usd;
+    if (session && typeof cost === 'number' && session.applyTelemetryCost(cost)) {
+      ctx.broadcast(SessionUpdated, { session: ctx.getSessionStateWithRespawn(session) });
+    }
 
     // Plan-usage limits (account-wide) → broadcast to the header chip, when
     // present and changed (the statusline fires on every assistant message).

@@ -100,6 +100,27 @@ const SENSITIVE_PATTERNS: RegExp[] = [
   /\/\.codeman[^/]*\/settings\.json$/,
   /\/\.codeman[^/]*\/push-keys\.json$/,
   /\/\.codeman[^/]*\/intents\.json$/,
+
+  // ── Windows side of WSL (Switchboard T7) ───────────────────────────────────
+  // A native folder dialog can pick anything under /mnt/<drive>, and a Windows
+  // profile holds far more secrets than a Linux home. NTFS is case-insensitive,
+  // so every /mnt pattern is /i. Anchored to `Users/<name>/` so a project that
+  // merely contains a folder called AppData somewhere else stays usable.
+  // Browser profiles, cookies, Credential Manager, DPAPI blobs and app tokens.
+  /^\/mnt\/[a-z]\/Users\/[^/]+\/AppData(\/|$)/i,
+  // The per-user dot-directories of the Linux list above, under a Windows profile
+  // (matched as whole trees there: `.aws/` holds more than credentials/config).
+  /^\/mnt\/[a-z]\/Users\/[^/]+\/(\.ssh|\.aws|\.azure|\.kube|\.gnupg|\.docker|\.config\/gcloud)(\/|$)/i,
+  // The registry hive of a profile, plus its transaction logs (NTUSER.DAT.LOG1 ...).
+  /\/NTUSER\.DAT/i,
+  // Windows itself. Drive C only: a folder named Windows on D: is somebody's project.
+  /^\/mnt\/c\/(Windows|Program Files|Program Files \(x86\)|ProgramData)(\/|$)/i,
+  // The system drive's root is the whole Windows installation and every profile.
+  /^\/mnt\/c\/?$/i,
+
+  // Key and vault files wherever they sit (a deploy key outside .ssh is the same secret).
+  /\.(kdbx|pem|pfx)$/i,
+  /\/id_(rsa|dsa|ecdsa|ed25519)[^/]*$/,
 ];
 
 /**

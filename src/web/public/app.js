@@ -1235,6 +1235,18 @@ class CodemanApp {
         this.closeSessionManager();
         this.closeCommandPalette?.();
         this.closeShortcutOverlay?.();
+        // App Settings / Session Options / Add Case close on Esc like the dialogs above (a11y).
+        // This listener is capture-phase, so it runs before a shortcut-capture field gets its own
+        // Esc (which means "cancel the rebind"); leave the modal open in that case.
+        if (!this._capturingShortcutId) {
+          for (const [id, close] of [
+            ['appSettingsModal', 'closeAppSettings'],
+            ['sessionOptionsModal', 'closeSessionOptions'],
+            ['createCaseModal', 'closeCreateCaseModal'],
+          ]) {
+            if (document.getElementById(id)?.classList.contains('active')) this[close]?.();
+          }
+        }
         // Overlay layouts only: below 1024px the sidebar is a modal off-canvas
         // drawer over the terminal, so Escape must close it. The docked desktop
         // sidebar is chrome, not a dialog — collapsing it would be a surprise.
@@ -1251,6 +1263,11 @@ class CodemanApp {
       // of layout. Option+1-9 = switch by index; Option+[ / Option+] = prev / next.
       if (e.altKey && !e.ctrlKey && !e.shiftKey) {
         const code = e.code || '';
+        if (code === 'Digit0' && this._tabOrientation() === 'vertical') {
+          e.preventDefault();
+          this.openHome();
+          return;
+        }
         const digitMatch = code.match(/^Digit([1-9])$/);
         if (digitMatch) {
           const idx = parseInt(digitMatch[1], 10) - 1;
@@ -1958,6 +1975,7 @@ class CodemanApp {
     this.sessions.set(session.id, session);
     this.renderSessionTabs();
     this.updateCost();
+    this._scheduleHomeRefresh?.();
     // Update tokens display if this is the active session
     if (session.id === this.activeSessionId && session.tokens) {
       this.updateRespawnTokens(session.tokens);
@@ -3059,7 +3077,9 @@ class CodemanApp {
   // Claude + Codex plan usage limits — account-global, so the latest sample
   // drives the shared header chip.
   _onSessionStatusTelemetry(data) {
+    this._planUsage = data;
     this.updatePlanUsageChip(data);
+    this._scheduleHomeRefresh?.();
     // Persist last-known so the chip shows immediately on the next page load /
     // SSE reconnect, instead of staying blank until a session next renders.
     try {
@@ -3075,6 +3095,7 @@ class CodemanApp {
       if (!raw) return;
       const saved = JSON.parse(raw);
       if (saved?.data && Date.now() - (saved.t || 0) < 12 * 3600 * 1000) {
+        this._planUsage = saved.data;
         this.updatePlanUsageChip(saved.data);
       }
     } catch {}
@@ -4197,7 +4218,10 @@ class CodemanApp {
 
     // Plan-usage chip: server's last-known telemetry, so it shows immediately on
     // a fresh load / reconnect (authoritative; wins over the localStorage restore).
-    if (data.planUsage) this.updatePlanUsageChip(data.planUsage);
+    if (data.planUsage) {
+      this._planUsage = data.planUsage;
+      this.updatePlanUsageChip(data.planUsage);
+    }
 
     // A board left open across a host reboot reconnects HERE, to a server that came
     // back with an empty session list. The reboot-restore offer is built at boot,
@@ -4665,7 +4689,7 @@ class CodemanApp {
     // Every dispatchable binding requires Ctrl/Cmd/Alt, so plain typing exits
     // before any registry work — this runs on the xterm keydown hot path.
     if (!e.ctrlKey && !e.metaKey && !e.altKey) return false;
-    if (!this.isSessionSidebarActive()) return false;
+    if (!this.isSessionSidebarActive() && this._tabOrientation() !== 'vertical') return false;
     if (typeof this.getShortcutRegistry !== 'function' || typeof this.matchesShortcutEvent !== 'function') {
       return false;
     }
@@ -4701,7 +4725,12 @@ class CodemanApp {
     const railOwnsTabs =
       !sidebar && document.documentElement.getAttribute('data-tab-orientation') === 'vertical';
     const host = sidebar ? sidebarList : railOwnsTabs && rail ? rail : headerHost;
-    if (tabsEl.parentElement !== host) host.appendChild(tabsEl);
+    if (tabsEl.parentElement !== host) {
+      // The rail pins its search above and "New session" below the list (T3), so the list goes between.
+      const railFoot = host === rail ? rail.querySelector('.tab-rail-foot') : null;
+      if (railFoot) host.insertBefore(tabsEl, railFoot);
+      else host.appendChild(tabsEl);
+    }
 
     document.documentElement.dataset.sessionList = sidebar ? 'sidebar' : 'header';
     // Detail is meaningless outside the sidebar, and must not linger as 'rich'
@@ -4739,9 +4768,14 @@ class CodemanApp {
     // applied when the layout goes back to the header strip would hide sessions
     // from the tab bar with no reachable control to clear it.
     if (!sidebar) {
-      this._sidebarFilter = '';
       const filterInput = document.getElementById('sessionSidebarFilter');
       if (filterInput) filterInput.value = '';
+      // The rail has its own search box, which stays reachable here; only a header strip has none.
+      if (!railOwnsTabs) {
+        this._sidebarFilter = '';
+        const railInput = document.getElementById('tabRailFilter');
+        if (railInput) railInput.value = '';
+      }
     }
 
     // applyTabWrapSettings() (settings-ui.js) is the ONE owner of
@@ -4786,6 +4820,11 @@ class CodemanApp {
   }
 
   toggleSessionSidebar() {
+    // The rail is the session list on desktop: the same chord folds it.
+    if (!this.isSessionSidebarActive() && this._tabOrientation() === 'vertical') {
+      this.toggleTabRail();
+      return;
+    }
     if (!this.isSessionSidebarActive()) return;
     const collapsed = !this.isSessionSidebarCollapsed();
     this._sidebarCollapsedOverride = collapsed;
@@ -4858,9 +4897,10 @@ class CodemanApp {
     const container = this.$('sessionTabs');
     if (!container) return;
     const reachable =
-      this.isSessionSidebarActive() && document.documentElement.dataset.sidebar !== 'collapsed';
+      (this.isSessionSidebarActive() && document.documentElement.dataset.sidebar !== 'collapsed') ||
+      this._railFilterReachable();
     const needle = reachable ? this._sidebarFilter : '';
-    for (const tab of container.querySelectorAll('.session-tab')) {
+    for (const tab of container.querySelectorAll('.session-tab:not(.session-tab--home)')) {
       if (!needle) {
         tab.classList.remove('tab-filtered-out');
         continue;
@@ -4871,6 +4911,167 @@ class CodemanApp {
     // The count shows visible rows, so it moves with every filter change —
     // including keystrokes in the filter box, which call this directly.
     this.updateSidebarCount();
+    this._updateRailGroupHeads();
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // Session rail (Switchboard T3): state stripe, groups, search, path tail
+  // ═══════════════════════════════════════════════════════════════
+
+  /** The rail's search box is on screen: vertical list, not the sidebar, not the 44px icon rail. */
+  _railFilterReachable() {
+    const root = document.documentElement;
+    return (
+      this._tabOrientation() === 'vertical' && !this.isSessionSidebarActive() && !root.classList.contains('tab-rail-compact')
+    );
+  }
+
+  /** Which of the rail's three groups a row state belongs to. */
+  _railGroupOf(state) {
+    if (state === 'needs' || state === 'error' || state === 'waiting') return 'attention';
+    return state === 'working' ? 'running' : 'quiet';
+  }
+
+  /**
+   * id → group for the rail's headers, or null when the rail is not grouped.
+   * Groups are the contiguous runs of the activity sort (needs/error/waiting, working, the rest),
+   * so they exist only while that sort does, and not in the 44px icon rail.
+   */
+  _railGroups(ids) {
+    if (!this.isTabRailSorted() || document.documentElement.classList.contains('tab-rail-compact')) return null;
+    if (typeof this._mobileOverviewState !== 'function') return null;
+    const out = new Map();
+    for (const id of ids) {
+      const session = this.sessions.get(id);
+      if (session) out.set(id, this._railGroupOf(this._mobileOverviewState(session, this.pendingHooks?.get(id))));
+    }
+    return out;
+  }
+
+  /**
+   * Header rows for the groups that have a member. A header takes the flex `order` of its group's
+   * first row and sits BEFORE the rows in the DOM, so an equal order still puts it first; rows keep
+   * the order `_tabRailSortOrder` gave them (no renumbering, the sort stays the one source of truth).
+   */
+  _railGroupHeadsHTML(sortOrder, groups) {
+    if (!sortOrder || !groups) return '';
+    const first = new Map();
+    for (const [id, group] of groups) {
+      const at = sortOrder.get(id);
+      if (at !== undefined && (!first.has(group) || at < first.get(group))) first.set(group, at);
+    }
+    const labels = { attention: 'Needs response', running: 'Running', quiet: 'Idle' };
+    return ['attention', 'running', 'quiet']
+      .filter((g) => first.has(g))
+      .map(
+        (g) =>
+          `<div class="tab-group-head tab-group-head--${g}" role="presentation" data-group="${g}" style="order:${first.get(g)}"><span class="tab-group-name">${labels[g]}</span><span class="tab-group-count" data-i18n-skip></span></div>`
+      )
+      .join('');
+  }
+
+  /** Counts per group from the rows actually showing (a search narrows them); an empty group hides. */
+  _updateRailGroupHeads() {
+    const container = this.$('sessionTabs');
+    const heads = container?.querySelectorAll('.tab-group-head');
+    if (!heads || heads.length === 0) return;
+    const counts = {};
+    for (const tab of container.querySelectorAll('.session-tab[data-tab-group]:not(.tab-filtered-out)')) {
+      counts[tab.dataset.tabGroup] = (counts[tab.dataset.tabGroup] || 0) + 1;
+    }
+    for (const head of heads) {
+      const n = counts[head.dataset.group] || 0;
+      head.hidden = n === 0;
+      const el = head.querySelector('.tab-group-count');
+      if (el && el.textContent !== String(n)) el.textContent = String(n);
+    }
+  }
+
+  /** `…/billing-service-v3`: the project folder is what tells two sessions with similar names apart. */
+  _railPathHTML(session) {
+    const parts = String(session.workingDir || '').split(/[\\/]+/).filter(Boolean);
+    if (!parts.length) return '';
+    const tail = `${parts.length > 1 ? '\u2026/' : '/'}${parts[parts.length - 1]}`;
+    return `<span class="tab-path" data-i18n-skip title="${escapeHtml(session.workingDir)}">${escapeHtml(tail)}</span>`;
+  }
+
+  /**
+   * Second line. Running: model, tokens, cost (whatever of them is known). Waiting on the user: how
+   * long. Quiet: when it last did anything. The two stamps keep `data-tab-ts` so the existing rich
+   * clock (`_tickSidebarRichTimes`) moves them without a rebuild.
+   */
+  _railSubHTML(row, session) {
+    const stamp = (ts, fmt) =>
+      `<span data-tab-ts="${ts || 0}" data-tab-fmt="${fmt}">${escapeHtml(this._sidebarRichStampText(ts, fmt))}</span>`;
+    const lastActivity = Number(session.lastActivityAt) || 0;
+    let inner = '';
+    if (row.state === 'working') {
+      const tokens = (Number(session.inputTokens) || 0) + (Number(session.outputTokens) || 0);
+      const cost = Number(session.totalCost) || 0;
+      inner = [
+        session.cliModel ? escapeHtml(String(session.cliModel)) : '',
+        tokens > 0 ? escapeHtml(this.formatTokens(tokens)) : '',
+        cost > 0 ? `$${cost.toFixed(2)}` : '',
+      ]
+        .filter(Boolean)
+        .join(' <span class="tab-sub-sep" aria-hidden="true">\u00B7</span> ');
+    }
+    if (!inner && row.state !== 'idle' && row.state !== 'done' && row.since) {
+      inner = `<span class="tab-sub-key">${escapeHtml(row.since.key)}</span> ${stamp(row.since.at, 'for')}`;
+    }
+    if (!inner) inner = stamp(lastActivity, 'ago');
+    return `<span class="tab-sub" data-i18n-skip>${inner}</span>`;
+  }
+
+  /** The state word on the right of line 1, plus the "watching" word when the pane still has work running. */
+  _railLabelHTML(row) {
+    const mod = row.exited ? 'exited' : row.state;
+    const watching = row.watching
+      ? `<span class="tab-state-label tab-state-label--watching" title="${escapeHtml(`Still running in the background: ${row.watching}`)}">watching</span>`
+      : '';
+    return `<span class="tab-state-label tab-state-label--${escapeHtml(mod)}">${escapeHtml(row.pill)}</span>${watching}`;
+  }
+
+  /** A to D while a split is open (depth-first pane order, A is the primary); '' otherwise and for sessions in no panel. */
+  _railPanelLetter(id) {
+    return this._splitLetterForSession?.(id) ?? '';
+  }
+
+  _railPanelBadgeHTML(id) {
+    const letter = this._railPanelLetter(id);
+    return letter
+      ? `<span class="tab-panel-badge" data-panel="${letter}" data-i18n-skip title="Panel ${letter}" aria-label="Panel ${letter}">${letter}</span>`
+      : '';
+  }
+
+  /** Incremental counterpart for a rail row: rebuild only what changed, never the whole card. */
+  _updateRailRow(tab, id, session, row) {
+    if (tab.dataset.tabState !== row.state) {
+      if (tab.dataset.tabState) tab.classList.remove(`tab-state-${tab.dataset.tabState}`);
+      tab.classList.add(`tab-state-${row.state}`);
+      tab.dataset.tabState = row.state;
+    }
+    const info = tab.querySelector('.tab-info');
+    if (info) {
+      const label = this._railLabelHTML(row);
+      const sub = this._railSubHTML(row, session);
+      const path = this._railPathHTML(session);
+      const sig = label + sub + path;
+      if (tab.dataset.tabRailSig !== sig) {
+        tab.dataset.tabRailSig = sig;
+        const nameRow = info.querySelector('.tab-name-row');
+        nameRow?.querySelectorAll('.tab-state-label').forEach((n) => n.remove());
+        nameRow?.querySelector('.tab-name')?.insertAdjacentHTML('afterend', label);
+        info.querySelectorAll('.tab-sub, .tab-path').forEach((n) => n.remove());
+        info.insertAdjacentHTML('beforeend', sub + path);
+      }
+    }
+    const letter = this._railPanelLetter(id);
+    const badge = tab.querySelector('.tab-panel-badge');
+    if ((badge?.dataset.panel || '') !== letter) {
+      badge?.remove();
+      if (letter) tab.querySelector('.tab-actions')?.insertAdjacentHTML('beforebegin', this._railPanelBadgeHTML(id));
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -5012,6 +5213,10 @@ class CodemanApp {
   _updateSidebarRichRow(tab, id, session) {
     const row = this._sidebarRichRow(id, session);
     if (!row) return;
+    if (this.isTabRailRich()) {
+      this._updateRailRow(tab, id, session, row);
+      return;
+    }
     const prev = tab.dataset.tabState;
     // The since ANCHOR moves without the state changing (each new turn re-stamps
     // lastSubmitAt), so key the compare on both.
@@ -5251,9 +5456,12 @@ class CodemanApp {
       existingWebIds.length === wantedWebIds.length && existingWebIds.every((id, i) => id === wantedWebIds[i]);
 
     // Check if we can do incremental update (same session IDs and same web tabs)
+    // The pinned Home row exists only on the vertical rail; with ZERO sessions nothing
+    // else would ever trigger the rebuild that draws it.
+    const homeTabUnchanged = !!container.querySelector('.session-tab--home') === (this._tabOrientation() === 'vertical');
     const canIncremental = existingIds.size === currentIds.size &&
       [...existingIds].every(id => currentIds.has(id)) &&
-      webTabsUnchanged;
+      webTabsUnchanged && homeTabUnchanged;
 
     if (canIncremental) {
       // Read once for the whole pass, like the full-rebuild path: this touches
@@ -5264,6 +5472,7 @@ class CodemanApp {
       // tab, so the full rebuild below is not reached. Recomputed per pass for
       // the same reason the rich meta line is: the order IS the state.
       const railSortOrder = this._tabRailSortOrder(this.sessionOrder.filter((sid) => this.sessions.has(sid)));
+      const railGroups = railSortOrder ? this._railGroups(this.sessionOrder.filter((sid) => this.sessions.has(sid))) : null;
       // Incremental update - only modify changed properties
       for (const [id, session] of this.sessions) {
         const tab = container.querySelector(`.session-tab[data-id="${id}"]`);
@@ -5274,12 +5483,19 @@ class CodemanApp {
         const railOrder = railSortOrder?.has(id) ? String(railSortOrder.get(id)) : '';
         if (tab.style.order !== railOrder) tab.style.order = railOrder;
 
+        // A session crossing groups (or groups switching on/off) needs a header added or removed,
+        // which only the full rebuild writes; same hand-off the task badge below uses.
+        if ((tab.dataset.tabGroup || '') !== (railGroups?.get(id) || '')) {
+          this._fullRenderSessionTabs();
+          return;
+        }
+
         // A web tab owns the active state while one is open. activeSessionId stays
         // set (the terminal keeps streaming underneath, and switching back is
         // instant): only the highlight moves. Without this the debounced render
         // re-marks the session tab active moments after a web tab was selected,
         // leaving two tabs lit at once.
-        const isActive = id === this.activeSessionId && !this.activeWebviewId;
+        const isActive = id === this.activeSessionId && !this.activeWebviewId && !this.homeActive;
         const status = session.status || 'idle';
         const name = this.getSessionName(session);
         const taskStats = session.taskStats || { running: 0, total: 0 };
@@ -5493,10 +5709,7 @@ class CodemanApp {
     const manualTwoRows = deviceType === 'desktop' ? (settings.tabTwoRows ?? defaults.tabTwoRows ?? false) : false;
 
     const orientation = window.CodemanTabOverflow?.resolveTabOrientation
-      ? window.CodemanTabOverflow.resolveTabOrientation({
-          deviceType,
-          setting: settings.tabOrientation ?? defaults.tabOrientation ?? 'horizontal',
-        })
+      ? window.CodemanTabOverflow.resolveTabOrientation({ deviceType })
       : 'horizontal';
     if (orientation === 'vertical') {
       container.classList.remove('tabs-auto-wrap');
@@ -5591,6 +5804,11 @@ class CodemanApp {
     // layout, and the tabs then carry no inline order at all — the header
     // strip's markup is byte-identical to before.
     const railSortOrder = this._tabRailSortOrder(tabOrder.filter((id) => this.sessions.has(id)));
+    // T3 rail: group headers + per-row stripe/label/second line/path. Both null/false elsewhere,
+    // so the header strip and the sidebar keep their markup byte-for-byte.
+    const railRich = this.isTabRailRich();
+    const railGroups = railSortOrder ? this._railGroups(tabOrder.filter((id) => this.sessions.has(id))) : null;
+    parts.push(this._railGroupHeadsHTML(railSortOrder, railGroups));
     let _tabIdx = 0;
     for (const id of tabOrder) {
       const session = this.sessions.get(id);
@@ -5599,7 +5817,7 @@ class CodemanApp {
 
       // See the note in the incremental path: a web tab owns the active highlight
       // while one is open, even though activeSessionId stays set.
-      const isActive = id === this.activeSessionId && !this.activeWebviewId;
+      const isActive = id === this.activeSessionId && !this.activeWebviewId && !this.homeActive;
       const status = session.status || 'idle';
       const name = this.getSessionName(session);
       const mode = session.mode || 'claude';
@@ -5640,7 +5858,8 @@ class CodemanApp {
       // other layout, and both helpers below collapse to '' — the header strip's
       // markup is unchanged.
       const richRow = richRows ? this._sidebarRichRow(id, session) : null;
-      const richMeta = this._sidebarRichMetaHTML(richRow);
+      const railRow = railRich ? richRow : null;
+      const richMeta = railRow ? '' : this._sidebarRichMetaHTML(richRow);
       const richClass = richRow ? ` tab-state-${richRow.state}` : '';
       const richData = richRow
         ? ` data-tab-state="${richRow.state}" data-tab-meta-sig="${richRow.state}${richRow.exited ? '+exited' : ''}:${richRow.since ? richRow.since.at : 0}:${richRow.createdAt}:${escapeHtml(richRow.watching)}"`
@@ -5654,7 +5873,8 @@ class CodemanApp {
       const inlineSessionActions = this.shouldInlineSessionActions();
       const tabActionsHtml = `<span class="tab-actions"><span class="tab-gear" onclick="event.stopPropagation(); app.openSessionOptions(${escapeHtml(JSON.stringify(id))})" title="Session options" aria-label="Session options" tabindex="0">&#x2699;</span><span class="tab-detach" onclick="event.stopPropagation(); app.detachSession(${escapeHtml(JSON.stringify(id))})" title="Open in a new window" aria-label="Open session in a new window" tabindex="0">&#x29C9;</span><span class="tab-close" onclick="event.stopPropagation(); app.requestCloseSession(${escapeHtml(JSON.stringify(id))})" title="Close session" aria-label="Close session" tabindex="0">&times;</span><button type="button" class="tab-more" onclick="event.stopPropagation(); app.openTabRailActionMenu(event, ${escapeHtml(JSON.stringify(id))})" title="Session actions" aria-label="Session actions">&#x22EF;</button></span>`;
 
-      parts.push(`<div class="session-tab ${isActive ? 'active' : ''}${alertClass}${richClass}${paneExitBadge ? ' tab-agent-exited' : ''}${loadState ? ' tab-loading' : ''}${this.hasTabDetachOverride(id) ? ' tab-show-detach' : ''}"${richData}${railOrderStyle} data-id="${id}" data-color="${color}" ${loadState ? `data-load-phase="${escapeHtml(loadState.phase)}"` : ''} onclick="app.handleSessionTabClick(event, ${escapeHtml(JSON.stringify(id))})" oncontextmenu="event.preventDefault(); app.startInlineRename(${escapeHtml(JSON.stringify(id))})" tabindex="0" role="tab" aria-selected="${isActive ? 'true' : 'false'}" aria-busy="${loadState ? 'true' : 'false'}" aria-label="${escapeHtml(paneExitAriaLabel(name, paneExitBadge))}" ${tabTooltip ? `title="${escapeHtml(tabTooltip)}"` : ''}>
+      parts.push(`<div class="session-tab ${isActive ? 'active' : ''}${alertClass}${richClass}${paneExitBadge ? ' tab-agent-exited' : ''}${loadState ? ' tab-loading' : ''}${this.hasTabDetachOverride(id) ? ' tab-show-detach' : ''}"${richData}${railOrderStyle}${railGroups?.has(id) ? ` data-tab-group="${railGroups.get(id)}"` : ''} data-id="${id}" data-color="${color}" ${loadState ? `data-load-phase="${escapeHtml(loadState.phase)}"` : ''} onclick="app.handleSessionTabClick(event, ${escapeHtml(JSON.stringify(id))})" oncontextmenu="event.preventDefault(); app.startInlineRename(${escapeHtml(JSON.stringify(id))})" tabindex="0" role="tab" aria-selected="${isActive ? 'true' : 'false'}" aria-busy="${loadState ? 'true' : 'false'}" aria-label="${escapeHtml(paneExitAriaLabel(name, paneExitBadge))}" ${tabTooltip ? `title="${escapeHtml(tabTooltip)}"` : ''}>
+          ${railRow ? '<span class="tab-stripe" aria-hidden="true"></span>' : ''}
           ${_tabIdx < 9 ? '<span class="tab-number">' + (_tabIdx + 1) + '</span>' : ''}
           ${loadState ? '<span class="tab-load-spinner" aria-hidden="true"></span>' : ''}
           <span class="tab-status ${status}" aria-hidden="true"></span>
@@ -5662,20 +5882,27 @@ class CodemanApp {
             <span class="tab-name-row">
               ${mode === 'shell' ? '<span class="tab-mode shell" aria-hidden="true">sh</span>' : mode === 'opencode' ? '<span class="tab-mode opencode" aria-hidden="true">oc</span>' : mode === 'codex' ? '<span class="tab-mode codex" aria-hidden="true">cx</span>' : mode === 'gemini' ? '<span class="tab-mode gemini" aria-hidden="true">gm</span>' : mode === 'antigravity' ? '<span class="tab-mode antigravity" aria-hidden="true">ag</span>' : mode === 'pi' ? '<span class="tab-mode pi" aria-hidden="true">pi</span>' : mode === 'grok' ? '<span class="tab-mode grok" aria-hidden="true">gk</span>' : mode === 'deepseek' ? '<span class="tab-mode deepseek" aria-hidden="true">ds</span>' : mode === 'omp' ? '<span class="tab-mode omp" aria-hidden="true">om</span>' : ''}
               <span class="tab-name" data-session-id="${id}" data-full-name="${escapeHtml(name)}">${tabLabel}</span>
+              ${railRow ? this._railLabelHTML(railRow) : ''}
               ${paneExitBadge ? `<span class="tab-exited-badge" data-i18n-skip aria-hidden="true">${escapeHtml(paneExitBadge)}</span>` : ''}
               ${inlineSessionActions ? tabActionsHtml : ''}
               <span class="tab-detached-badge" aria-hidden="true">detached</span>
             </span>
             ${showFolder ? `<span class="tab-folder">\u{1F4C1} ${escapeHtml(folderName)}</span>` : ''}
             ${richMeta}
+            ${railRow ? this._railSubHTML(railRow, session) + this._railPathHTML(session) : ''}
           </span>
           ${hasRunningTasks ? `<span class="tab-badge" onclick="event.stopPropagation(); app.toggleTaskPanel()" aria-label="${taskStats.running} running tasks">${taskStats.running}</span>` : ''}
           ${subagentBadge}
           ${ultracodeBadge}
+          ${railRow ? this._railPanelBadgeHTML(id) : ''}
           ${inlineSessionActions ? '' : tabActionsHtml}
         </div>`);
       _tabIdx++;
     }
+
+    // Home is pinned at index 0 (CSS `order: -1` keeps it there on the sorted rail) and is not
+    // numbered: Alt+0 reaches it, Alt+1..9 keep naming sessions.
+    if (this._tabOrientation() === 'vertical' && this.renderHomeTab) parts.unshift(this.renderHomeTab());
 
     // Web tabs (dashboard URLs) render after the session tabs, continuing the
     // Alt+N numbering. They carry data-webview-id instead of data-id, so every
@@ -5757,8 +5984,10 @@ class CodemanApp {
       // Enter or Space activates the tab
       if ((e.key === 'Enter' || e.key === ' ') && currentIndex >= 0) {
         e.preventDefault();
-        const sessionId = tabs[currentIndex].dataset.id;
-        this.selectSession(sessionId, { forceReload: true });
+        const focused = tabs[currentIndex];
+        if (focused.dataset.home) return this.openHome();
+        if (focused.dataset.webviewId) return this.openWebview(focused.dataset.webviewId);
+        this.selectSession(focused.dataset.id, { forceReload: true });
         return;
       }
 
@@ -5884,8 +6113,10 @@ class CodemanApp {
     // affordance instead of lying about it — `tabRailSort: 'manual'` is the way
     // back to drag-reordering, and Alt+N / Ctrl+Shift+{ } still walk the strip
     // order this list is no longer showing.
+    // The rows stay draggable for the one thing a sorted list can still do with them: dropping a
+    // session on the work area to split it (terminal-split.js). No reorder handlers are bound.
     if (this.isTabRailSorted()) {
-      tabs.forEach((tab) => tab.setAttribute('draggable', 'false'));
+      tabs.forEach((tab) => tab.setAttribute('draggable', 'true'));
       return;
     }
 
@@ -6629,8 +6860,9 @@ class CodemanApp {
       return; // newer tab switch won
     }
 
-    // A session tab takes the stage back from any active web tab.
+    // A session tab takes the stage back from any active web tab, or the Home tab.
     this._hideWebviewLayer?.();
+    this._hideHome?.();
 
     this._cleanupPreviousSession(sessionId);
     this.activeSessionId = sessionId;
@@ -7580,10 +7812,11 @@ class CodemanApp {
     await this.closeSession(this.activeSessionId);
   }
 
-  async killAllSessions() {
+  async killAllSessions(confirmed = false) {
     if (this.sessions.size === 0) return;
 
-    if (!confirm(`Kill all ${this.sessions.size} session(s)?`)) return;
+    // The menu bar confirms in its own dialog and passes true; any other caller keeps the native prompt.
+    if (!confirmed && !confirm(`Kill all ${this.sessions.size} session(s)?`)) return;
 
     try {
       await this._apiDelete('/api/sessions');

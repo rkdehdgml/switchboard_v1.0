@@ -64,7 +64,7 @@ describe('split-pane auto-collapse in a real browser', () => {
 
     const collapsed = await page.evaluate(() => ({
       hasContainer: document.querySelector('.terminal-split-container') === null,
-      splitPaneNulled: (window as any).app._splitPane === null,
+      splitPaneNulled: (window as any).app._splitTree === null,
     }));
     expect(collapsed.hasContainer).toBe(true);
     expect(collapsed.splitPaneNulled).toBe(true);

@@ -440,6 +440,8 @@ Object.assign(CodemanApp.prototype, {
 
     sessionItems.push(this._buildCommandPaletteNewSessionItem(query));
     sessionItems.push({ id: 'browse-sessions', type: 'browse-sessions', title: 'Browse all sessions…', subtitle: 'Open Session Manager' });
+    // Menu-bar commands (menu-bar.js) show only while searching, so the idle list is unchanged.
+    sessionItems.push(...(this.buildMenuCommandItems?.(query) ?? []));
     return sessionItems;
   },
 
@@ -507,7 +509,7 @@ Object.assign(CodemanApp.prototype, {
     list.innerHTML = items
       .map((item, index) => {
         const active = index === this.commandPaletteActiveIndex ? ' active' : '';
-        const icon = item.type === 'new-session' ? '+' : item.type === 'browse-sessions' ? '≡' : '›';
+        const icon = item.type === 'new-session' ? '+' : item.type === 'browse-sessions' ? '≡' : item.type === 'command' ? '⌘' : '›';
         const browse = item.type === 'browse-sessions' ? ' command-palette-item--browse' : '';
         return `
           <button class="command-palette-item${active}${browse}" type="button" data-command-index="${index}">
@@ -540,6 +542,10 @@ Object.assign(CodemanApp.prototype, {
     }
     if (item.type === 'browse-sessions') {
       this.openSessionManager();
+      return;
+    }
+    if (item.type === 'command') {
+      item.run();
       return;
     }
     if (item.type === 'new-session') {

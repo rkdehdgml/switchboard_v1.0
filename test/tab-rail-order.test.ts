@@ -227,12 +227,15 @@ describe('vertical tab rail row order', () => {
     expect(appJs).toContain("const railOrder = railSortOrder?.has(id) ? String(railSortOrder.get(id)) : '';");
   });
 
-  it('drops the drag affordance while sorting, so a card cannot snap back', () => {
+  it('binds no reorder handlers while sorting, so a card cannot snap back (rows stay draggable only to split)', () => {
     const drag = appJs.slice(appJs.indexOf('setupTabDragHandlers() {'));
-    expect(drag.indexOf('if (this.isTabRailSorted()) {')).toBeLessThan(
-      drag.indexOf("tab.setAttribute('draggable', 'true')")
-    );
-    expect(drag).toContain("tabs.forEach((tab) => tab.setAttribute('draggable', 'false'));");
+    const sorted = drag.indexOf('if (this.isTabRailSorted()) {');
+    const ret = drag.indexOf('return;', sorted);
+    expect(sorted).toBeGreaterThan(-1);
+    // The early return comes before any dragstart/dragover/drop wiring…
+    expect(ret).toBeLessThan(drag.indexOf("tab.addEventListener('dragstart'"));
+    // …and the only thing the sorted branch does is keep the row draggable for the split drop.
+    expect(drag.slice(sorted, ret)).toContain("tab.setAttribute('draggable', 'true')");
   });
 
   it('classifies and compares through the shared helpers, never a local copy', () => {

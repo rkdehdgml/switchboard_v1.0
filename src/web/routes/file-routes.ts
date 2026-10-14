@@ -62,6 +62,7 @@ import {
 import { downloadTooLargeMessage, exceedsDownloadLimit } from '../../config/buffer-limits.js';
 import { parseByteRange } from '../http-range.js';
 import { isSensitivePath } from '../sensitive-path.js';
+import { readProjectRoots } from '../work-folders.js';
 import { SseEvent } from '../sse-events.js';
 import type { ConfigPort, EventPort, SessionPort } from '../ports/index.js';
 import { FilesystemBrowseQuerySchema, FilesystemPreviewQuerySchema, FileWriteSchema } from '../schemas.js';
@@ -756,6 +757,15 @@ function isBlockedPickerPath(path: string, blockedTrees: readonly string[], dire
   return directory && isBlockedAttachmentPath(join(path, '__codeman_path_picker_probe__'), blockedTrees);
 }
 
+/**
+ * The registered work-folder roots (Switchboard T6) as picker roots, so a folder the user added
+ * under Settings › Work folders is also one the folder dialogs may choose. Read per request: a root
+ * added a moment ago must work at once, and the file is tiny.
+ */
+function registeredWorkFolderRoots(): Array<{ label: string; path: string }> {
+  return readProjectRoots().map((path, index) => ({ label: `Work folder ${index + 1}`, path }));
+}
+
 function extraConfiguredPickerRoots(): Array<{ label: string; path: string }> {
   const extraRoots = process.env.CODEMAN_FILE_PICKER_ROOTS;
   if (!extraRoots) return [];
@@ -787,6 +797,7 @@ function configuredFilesystemPickerRoots(req: FastifyRequest): Array<{ label: st
     { label: 'Home', path: homedir() },
     { label: 'Codeman Cases', path: CASES_DIR },
     { label: 'WSL D:', path: '/mnt/d' },
+    ...registeredWorkFolderRoots(),
     ...extraConfiguredPickerRoots(),
   ];
 }
@@ -906,6 +917,52 @@ async function resolveFilesystemPickerPath(
       roots.map((root) => root.path)
     ),
   };
+}
+
+/** Outcome of {@link checkPickerFolder}: the verified real path, or the first check that failed. */
+export type PickerFolderCheck =
+  | { ok: true; resolvedPath: string; rootPath: string }
+  | {
+      ok: false;
+      step: 'realpath' | 'roots' | 'blocklist';
+      reason: 'not_found' | 'outside_roots' | 'blocked' | 'not_directory';
+    };
+
+/**
+ * Is this existing folder one the caller may use, by the SAME rules as the path picker?
+ * Switchboard T7: the native dialog can choose anywhere, so this is the only gate. Order is
+ * deliberate: realpath (links resolved) -> inside a browse root -> blocklist (the directory
+ * itself, via the child probe) -> really a directory. Type is checked last so a path outside
+ * the roots never tells the caller whether it exists as a file or a folder.
+ */
+export async function checkPickerFolder(
+  ctx: SessionPort & ConfigPort,
+  req: FastifyRequest,
+  absolutePath: string
+): Promise<PickerFolderCheck> {
+  const roots = await resolveFilesystemPickerRoots(ctx, req);
+  let resolvedPath: string;
+  try {
+    resolvedPath = realpathSync(absolutePath);
+  } catch {
+    return { ok: false, step: 'realpath', reason: 'not_found' };
+  }
+  const matchingRoot = findMatchingPickerRoot(roots, resolvedPath);
+  if (!matchingRoot) return { ok: false, step: 'roots', reason: 'outside_roots' };
+
+  const guard = await loadAttachmentGuardConfig();
+  const trees = pickerBlockedTrees(
+    guard.blockedTrees,
+    roots.map((root) => root.path)
+  );
+  if (isBlockedPickerPath(resolvedPath, trees, true)) return { ok: false, step: 'blocklist', reason: 'blocked' };
+
+  try {
+    if (!(await fs.stat(resolvedPath)).isDirectory()) return { ok: false, step: 'blocklist', reason: 'not_directory' };
+  } catch {
+    return { ok: false, step: 'realpath', reason: 'not_found' };
+  }
+  return { ok: true, resolvedPath, rootPath: matchingRoot.path };
 }
 
 function appendDownloadFlag(url: string): string {

@@ -1,6 +1,6 @@
 # Split-Pane Sessions — Design Spec
 
-**Status**: Implemented (v1)
+**Status**: Implemented (v1). Extended by Switchboard T5 (up to four panes, stacked splits, saved layout): where this file says "two panes", "side-by-side only" or "no persistence", the T5 paragraph in `docs/architecture-invariants.md` (Split work area) is current.
 **Author**: Claude (session with Tim), 2026-09-15
 **Scope**: v1 only. v2 items are named and explicitly deferred, not designed.
 

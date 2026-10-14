@@ -636,6 +636,16 @@ const VoiceInput = {
     }
   },
 
+  /**
+   * Web Speech wants a full BCP-47 tag but the picker stores bare ones ('ko'). 'multi'
+   * (auto-detect) has no browser equivalent, so it falls back to the browser's own language.
+   */
+  _webSpeechLang(language) {
+    const FULL = { es: 'es-ES', fr: 'fr-FR', de: 'de-DE', ja: 'ja-JP', ko: 'ko-KR' };
+    if (!language || language === 'multi') return navigator.language || 'en-US';
+    return language.includes('-') ? language : FULL[language] || language;
+  },
+
   /** Try to create a SpeechRecognition instance */
   _initRecognition() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -809,6 +819,8 @@ const VoiceInput = {
       }
       return;
     }
+    // The picker's language applies to this engine too (it was pinned to en-US).
+    this.recognition.lang = this._webSpeechLang(this._getDeepgramConfig().language);
     this.isRecording = true;
     this._activeProvider = 'webspeech';
     this._accumulatedFinal = '';

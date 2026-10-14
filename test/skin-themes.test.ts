@@ -11,6 +11,7 @@ const indexSource = readFileSync(resolve('src/web/public/index.html'), 'utf8');
 const stylesSource = readFileSync(resolve('src/web/public/styles.css'), 'utf8');
 const mobileStylesSource = readFileSync(resolve('src/web/public/mobile.css'), 'utf8');
 const terminalSource = readFileSync(resolve('src/web/public/terminal-ui.js'), 'utf8');
+const themeSource = readFileSync(resolve('src/web/public/theme-ui.js'), 'utf8');
 
 const LIGHT_SKINS = ['paper-gray', 'solarized-light', 'catppuccin-latte', 'rose-pine-dawn'] as const;
 
@@ -83,7 +84,8 @@ describe('Codeman light skins', () => {
 
   it('keeps the picker, pre-paint allowlist, CSS, and xterm palette in sync', () => {
     for (const skin of LIGHT_SKINS) {
-      expect(indexSource).toContain(`value="${skin}"`);
+      // The picker is built by theme-ui.js from its skin lists (no <option>s in the markup).
+      expect(themeSource).toContain(`'${skin}'`);
       expect(indexSource).toContain(`'${skin}'`);
       expect(stylesSource).toContain(`html[data-skin="${skin}"]`);
       expect(stylesSource).toMatch(new RegExp(`html\\[data-skin="${skin}"\\] \\{[\\s\\S]*?color-scheme: light;`));
@@ -149,13 +151,13 @@ describe('Codeman light skins', () => {
     terminal.mixin.applyTerminalSkin.call(app, 'paper-gray');
     expect(main.options.minimumContrastRatio).toBe(4.5);
     expect(teammate.options.minimumContrastRatio).toBe(4.5);
-    expect((main.options.theme as Record<string, string>).background).toBe('#f6f8fa');
+    expect((main.options.theme as Record<string, string>).background).toBe('#ffffff');
     expect(refreshFont).toHaveBeenCalledTimes(1);
 
     terminal.mixin.applyTerminalSkin.call(app, 'daylight-blue');
     expect(main.options.minimumContrastRatio).toBe(1);
     expect(teammate.options.minimumContrastRatio).toBe(1);
-    expect((main.options.theme as Record<string, string>).background).toBe('#161b23');
+    expect((main.options.theme as Record<string, string>).background).toBe('#0c0d10');
     expect(refreshFont).toHaveBeenCalledTimes(2);
   });
 
@@ -169,7 +171,7 @@ describe('Codeman light skins', () => {
   });
 
   it('uses skin variables for the pre-paint skeleton and native controls', () => {
-    expect(indexSource).toContain('background:var(--term-bg,#161b23)');
+    expect(indexSource).toContain('background:var(--term-bg,#0c0d10)');
     expect(indexSource).toContain('background:var(--glass-bg,rgba(31,38,48,0.85))');
     expect(stylesSource).toContain('color-scheme: light;');
     expect(stylesSource).toContain('background: var(--floating-bg);');

@@ -196,8 +196,9 @@ describe('session list layout', () => {
     expect(tabsEl(win).getAttribute('aria-orientation')).toBe('vertical');
   });
 
-  it('keeps aria orientation synchronized when tab orientation moves hosts', () => {
-    const { win, app } = boot({ stored: { sessionListLayout: 'header', tabOrientation: 'vertical' } });
+  it('keeps aria orientation synchronized when the device class moves the list between hosts', () => {
+    // Switchboard: the rail is not a setting. A desktop window always gets it; a phone gets the header strip.
+    const { win, app } = boot({ stored: { sessionListLayout: 'header' } });
 
     app.applySessionListLayout();
     app.applyTabOrientation();
@@ -205,11 +206,7 @@ describe('session list layout', () => {
     expect(tabsEl(win).parentElement?.id).toBe('tabRail');
     expect(tabsEl(win).getAttribute('aria-orientation')).toBe('vertical');
 
-    win.localStorage.setItem(
-      'codeman-app-settings',
-      JSON.stringify({ sessionListLayout: 'header', tabOrientation: 'horizontal' })
-    );
-    delete (app as unknown as { _cachedAppSettings?: unknown })._cachedAppSettings;
+    (win as unknown as { eval: (s: string) => void }).eval("MobileDetection.getDeviceType = () => 'mobile'");
     app.applyTabOrientation();
 
     expect(tabsEl(win).parentElement?.id).toBe('sessionTabsHost');
@@ -814,8 +811,9 @@ describe('rich session sidebar', () => {
     // wrapping — and the collapsed 44px rail hides .tab-info wholesale, which is
     // what keeps the stamps out of it for free.
     expect(APP).toContain('const richRows = this.isRichTabRows();');
-    expect(APP).toContain('const richMeta = this._sidebarRichMetaHTML(richRow);');
-    expect(APP).toContain('${richMeta}\n          </span>');
+    // T3: the rail draws its own second/third line instead of the meta line; every other layout still gets it.
+    expect(APP).toContain("const richMeta = railRow ? '' : this._sidebarRichMetaHTML(richRow);");
+    expect(APP).toContain('${richMeta}\n            ${railRow ?');
   });
 
   it('plumbs the third option through the settings UI and the pre-paint script', () => {
@@ -884,10 +882,14 @@ describe('detailed rows in the vertical tab rail', () => {
   });
 
   it('never draws stamps in the horizontal header strip', () => {
-    // tabRailDetail stays 'rich' in storage while the orientation is horizontal:
+    // tabRailDetail stays 'rich' in storage while the orientation is horizontal (a phone):
     // the gate has to read BOTH, or the header strip inherits a meta line that
     // has nowhere to go.
-    const { win, app } = railBoot({ tabOrientation: 'horizontal', tabRailDetail: 'rich' });
+    const booted = boot({ deviceType: 'mobile', stored: { sessionListLayout: 'header', tabRailDetail: 'rich' } });
+    booted.app.applySessionListLayout();
+    booted.app.applyTabOrientation();
+    const { win, app } = booted;
+    expect(win.document.documentElement.dataset.tabOrientation).toBe('horizontal');
     expect(win.document.documentElement.dataset.tabRailDetail).toBe('rich');
     expect(app.isTabRailRich()).toBe(false);
     expect(app.isRichTabRows()).toBe(false);

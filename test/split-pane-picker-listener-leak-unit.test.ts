@@ -47,14 +47,15 @@ function makeFakeElement(tag: string) {
       return children.some((c) => c.contains(target));
     },
     // Real Element.closest(): walk up from THIS element (inclusive), matching
-    // a bare class selector like `.btn-split` against a space-separated
-    // className — enough to exercise the fix's `e.target.closest('.btn-split')`
-    // check without a real DOM.
+    // bare class selectors like `.btn-split` (or a comma-separated list of them,
+    // as the picker's own outside-click check uses) against a space-separated
+    // className — enough to exercise that check without a real DOM.
     closest(selector: string): ReturnType<typeof makeFakeElement> | null {
-      const cls = selector.replace(/^\./, '');
+      const wanted = selector.split(',').map((part) => part.trim().replace(/^\./, ''));
       let node: ReturnType<typeof makeFakeElement> | null = el;
       while (node) {
-        if (node.className.split(/\s+/).includes(cls)) return node;
+        const have = node.className.split(/\s+/);
+        if (wanted.some((cls) => have.includes(cls))) return node;
         node = (node as unknown as { __parent: ReturnType<typeof makeFakeElement> | null }).__parent;
       }
       return null;

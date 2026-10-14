@@ -78,6 +78,31 @@ const filesystemPickerPathSchema = z
  */
 const showHiddenQuerySchema = z.enum(['true', 'false']).optional();
 
+/**
+ * Native folder dialog result (Switchboard T7). Deliberately loose: the string is whatever
+ * Windows returned (drive path, UNC, \\wsl.localhost\...), so the real validation lives in
+ * `native-folder.ts` and the route, not in a regex here.
+ */
+export const NativeFolderValidateSchema = z.object({
+  path: z.string().min(1).max(4096),
+  /** `work-folder`: the choice is meant to become a work folder (T6), so the work-folder zone rules apply instead of the picker roots. */
+  purpose: z.enum(['work-folder']).optional(),
+});
+
+/** POSIX path to show as a Windows path (the dialog's `defaultPath`). */
+export const NativeFolderWindowsPathQuerySchema = z.object({ path: filesystemPickerPathSchema });
+
+/** Work folders (Switchboard T6): one folder path. Validation proper is `validateWorkFolder()`. */
+export const WorkFolderPathSchema = z.object({ path: z.string().min(1).max(4096) });
+
+/** Change the default location for new cases, and say what happens to the cases already there. */
+export const WorkFolderBaseSchema = z.object({
+  path: z.string().min(1).max(4096),
+  existingCases: z.enum(['link', 'hide']),
+});
+
+export const WorkFolderScanQuerySchema = z.object({ gitOnly: z.enum(['true', 'false']).optional() });
+
 /** Query validation for the lazy, allowlisted filesystem path picker. */
 export const FilesystemBrowseQuerySchema = z.object({
   path: filesystemPickerPathSchema.optional(),
@@ -1228,6 +1253,11 @@ export const RebootRestoreRequestSchema = z
   })
   .strict();
 
+/** Theme choices, shared with server.ts (pre-paint injection) so the lists cannot drift. */
+export const THEME_MODES = ['dark', 'light', 'system'] as const;
+export const DARK_SKINS = ['daylight-blue', 'daylight-green', 'og'] as const;
+export const LIGHT_SKINS = ['paper-gray', 'solarized-light', 'catppuccin-latte', 'rose-pine-dawn'] as const;
+
 export const SettingsUpdateSchema = z
   .object({
     // User-facing product branding. This changes browser/UI copy only; package,
@@ -1246,6 +1276,11 @@ export const SettingsUpdateSchema = z
         'Display name must not contain control characters'
       )
       .optional(),
+    // Theme (T1). Stored on the server, not in localStorage: localStorage is per
+    // origin (port included), so a desktop shell that moves ports would lose it.
+    themeMode: z.enum(THEME_MODES).optional(),
+    darkSkin: z.enum(DARK_SKINS).optional(),
+    lightSkin: z.enum(LIGHT_SKINS).optional(),
     // Paths
     defaultClaudeMdPath: z.string().max(500).optional(),
     defaultWorkingDir: z.string().max(500).optional(),

@@ -13,8 +13,12 @@
 (function initCodemanI18n(global) {
   'use strict';
 
+  // `DEFAULT_NAME` is the SOURCE token the markup and translations are written with; `PRODUCT_NAME` is
+  // what this fork shows. A stored or typed "Codeman" (every settings save before the rename wrote it)
+  // therefore reads as "no custom name", never as a deliberate choice.
   const DEFAULT_NAME = 'Codeman';
-  const SUPPORTED_LANGUAGES = new Set(['en', 'zh-CN']);
+  const PRODUCT_NAME = 'Switchboard';
+  const SUPPORTED_LANGUAGES = new Set(['en', 'zh-CN', 'ko']);
   const TRANSLATABLE_ATTRIBUTES = ['title', 'aria-label', 'placeholder'];
   const SKIP_SELECTOR = [
     '[data-i18n-skip]',
@@ -883,28 +887,384 @@
     'Remove Tab': '移除标签页',
     'Remove All Tabs': '移除所有标签页',
     'Use arrows to reorder. Changes are saved automatically.': '使用方向键重新排序；更改会自动保存。',
+    Theme: '主题',
+    Dark: '深色',
+    Light: '浅色',
+    System: '跟随系统',
+    'Skin when dark': '深色时的配色',
+    'Skin when light': '浅色时的配色',
+    'Terminal colors follow the skin.': '终端颜色会跟随配色方案变化。',
+    'Follows the Windows app mode. Now: dark': '跟随 Windows“默认应用模式”。当前：深色',
+    'Follows the Windows app mode. Now: light': '跟随 Windows“默认应用模式”。当前：浅色',
+    'Always dark, regardless of Windows.': '始终使用深色，与 Windows 设置无关。',
+    'Always light, regardless of Windows.': '始终使用浅色，与 Windows 设置无关。',
+    "Changes apply immediately and are saved in this PC's Codeman settings.":
+      '更改会立即生效，并保存在此电脑的 Codeman 设置中。',
+    'Main menu': '主菜单',
+    Automation: '自动化',
+    Environment: '环境',
+    'New session': '新建会话',
+    'Split side by side': '左右分屏',
+    'A split holds at most 4 panels': '分屏最多支持 4 个面板',
+    'Drop to split side by side': '松开即可左右分屏',
+    'Drop to split top and bottom': '松开即可上下分屏',
+    'Splitting needs a wider window': '分屏需要更宽的窗口',
+    'Open a session first': '请先打开一个会话',
+    'Already shown in a panel': '已在某个面板中显示',
+    'This session is not running': '该会话未在运行',
+    'This session is in its own window': '该会话在独立窗口中',
+    'Cannot split here': '此处无法分屏',
+    'Select project folder': '选择项目文件夹',
+    'This folder is outside the allowed work folders': '此文件夹不在允许的工作文件夹内',
+    'Add the root first under Settings › Work folders.': '请先在“设置 › 工作文件夹”中添加根目录。',
+    'Open work folder settings': '打开工作文件夹设置',
+    'This folder is blocked for security': '出于安全原因，此文件夹已被阻止',
+    'Locations that hold credentials cannot be chosen. For example ~/.ssh.': '无法选择存放凭据的位置，例如 ~/.ssh。',
+    'This is a different WSL distribution': '这是另一个 WSL 发行版',
+    'Choose a folder inside this WSL distribution.': '请选择此 WSL 发行版内的文件夹。',
+    'Network locations cannot be used': '无法使用网络位置',
+    'Choose a local folder instead of \\\\server\\share.': '请选择本地文件夹，而不是 \\\\server\\share。',
+    'This folder was not found': '未找到此文件夹',
+    'It may have been moved or deleted, or its drive is not available in WSL.':
+      '它可能已被移动或删除，或其所在驱动器在 WSL 中不可用。',
+    'This is not a folder': '这不是文件夹',
+    'Choose a folder, not a file.': '请选择文件夹，而不是文件。',
+    'This path cannot be used': '无法使用此路径',
+    'The dialog returned a path in a form Switchboard does not accept.': '对话框返回的路径格式无法使用。',
+    'This folder is too broad': '此文件夹范围过大',
+    'Choose a work folder, not a drive, the home directory or /.': '请选择工作文件夹，而不是驱动器、主目录或 /。',
+    'This folder cannot be a work folder': '此文件夹不能作为工作文件夹',
+    'Work folders must be inside the home directory or inside a folder on a Windows drive.':
+      '工作文件夹必须位于主目录内或 Windows 驱动器上的某个文件夹内。',
+    'Work folders': '工作文件夹',
+    'Where new cases are created, and which folders are searched for projects you already have.':
+      '设置新案例的创建位置，以及搜索现有项目的文件夹。',
+    'Project search roots': '项目搜索根目录',
+    Browse: '浏览',
+    'Roots are only searched for projects. Nothing is moved when you add or remove one.':
+      '根目录仅用于查找项目。添加或移除不会移动任何内容。',
+    'Fixed by environment variable': '由环境变量固定',
+    'Slow mount': '挂载较慢',
+    'Folder not found': '文件夹不存在',
+    'Change default location': '更改默认位置',
+    'The new default location applies after the next restart': '新的默认位置将在下次重启后生效',
+    'The maximum number of work folders is registered.': '已达到可注册的工作文件夹上限。',
+    'Discovered projects': '已发现的项目',
+    'Git repositories only': '仅 Git 仓库',
+    'Searching…': '正在搜索…',
+    'The search took too long and shows what was found so far.': '搜索耗时过长，仅显示目前找到的结果。',
+    'There are more projects than can be shown. Showing the first ones.':
+      '项目数量超过可显示的上限，仅显示前面的部分。',
+    'No projects found under the registered folders.': '在已注册的文件夹下没有找到项目。',
+    Select: '选择',
+    'Already registered': '已注册',
+    Selected: '已选择',
+    'Registering a project does not move the folder': '注册项目不会移动文件夹',
+    'Search again': '重新搜索',
+    'Add as projects': '添加为项目',
+    'Could not load the work folders.': '无法加载工作文件夹。',
+    'Work folder added': '已添加工作文件夹',
+    'Select work folder': '选择工作文件夹',
+    'Projects added': '已添加的项目',
+    'Could not add': '无法添加',
+    'New cases are created in this folder. Existing cases are never moved or deleted.':
+      '新案例将创建在此文件夹中。现有案例不会被移动或删除。',
+    'New default location': '新的默认位置',
+    'Select default location': '选择默认位置',
+    'Existing cases in the old location': '旧位置中的现有案例',
+    'Keep them in the list (linked where they are)': '保留在列表中（原地链接）',
+    'Leave them out of the list (files stay untouched)': '从列表中排除（文件保持不变）',
+    'Applies after the next restart. Running sessions keep the old path.': '下次重启后生效。正在运行的会话保持旧路径。',
+    'Docker cases keep their old folder mounted. Recreate them to use the new location.':
+      'Docker 案例仍挂载旧文件夹。请重新创建以使用新位置。',
+    'Saved. Applies after the next restart.': '已保存。下次重启后生效。',
+    'Something went wrong': '出了点问题',
+    'This is not a usable folder path': '这不是可用的文件夹路径',
+    'This folder is too broad: choose a work folder, not a drive, the home directory or /':
+      '范围过大：请选择工作文件夹，而不是驱动器、主目录或 /',
+    'Work folders must be inside the home directory or inside a folder on a Windows drive':
+      '工作文件夹必须位于主目录内或 Windows 驱动器上的某个文件夹内',
+    'Access to this folder is blocked': '无法访问此文件夹',
+    'This folder is not writable': '此文件夹不可写',
+    'This folder is already a work folder': '此文件夹已是工作文件夹',
+    'The default location cannot be removed': '无法移除默认位置',
+    'At most 20 work folders can be registered': '最多可注册 20 个工作文件夹',
+    'The default location is fixed by the CODEMAN_CASES_PATH environment variable':
+      '默认位置由环境变量 CODEMAN_CASES_PATH 固定',
+    'A scan is already running': '搜索已在进行中',
+    'Change the project of this session': '更改此会话的项目',
+    "This session's project": '此会话的项目',
+    Recent: '最近',
+    'No recent projects': '没有最近的项目',
+    'Browse for a folder…': '浏览文件夹…',
+    'Switching the project starts a new conversation. The current conversation is not moved to the other folder.':
+      '切换项目会开始新的对话。当前对话不会移动到另一个文件夹。',
+    'Only Claude sessions can switch projects.': '只有 Claude 会话可以切换项目。',
+    'Switch project': '切换项目',
+    'Current folder': '当前文件夹',
+    'Recent projects': '最近的项目',
+    'New folder': '新文件夹',
+    'New session (recommended)': '新建会话（推荐）',
+    'Restart this session': '重新启动此会话',
+    'The current session and its conversation stay as they are. You can return to it from the rail at any time.':
+      '当前会话及其对话保持不变。你可以随时从侧栏返回。',
+    "Work in progress is interrupted and this session's conversation is closed on screen. The history file stays under the original project folder.":
+      '正在进行的工作会被中断，此会话的对话将在界面中关闭。历史记录文件仍保留在原项目文件夹下。',
+    "This session's conversation is closed on screen. The history file stays under the original project folder.":
+      '此会话的对话将在界面中关闭。历史记录文件仍保留在原项目文件夹下。',
+    'Project switched': '项目已切换',
+    'New session started': '已开始新会话',
+    'Could not switch the project': '无法切换项目',
+    'Could not check the folder': '无法检查该文件夹',
+    'The server did not answer. Try again.': '服务器没有响应，请重试。',
+    'Checking the folder…': '正在检查文件夹…',
+    'Input format': '输入格式',
+    'Path conversion': '路径转换',
+    'Real path': '实际路径',
+    'Allowed work folder': '允许的工作文件夹',
+    'Security block list': '安全阻止列表',
+    Failed: '失败',
+    'WSL path': 'WSL 路径',
+    'Windows path': 'Windows 路径',
+    'Resolved from a link': '已跟随链接得到的实际路径',
+    'Split: add another panel': '分屏：添加面板',
+    'Split top and bottom': '上下分屏',
+    'Close panel': '关闭面板',
+    'Change the session in this panel': '更换此面板的会话',
+    'Choose a session': '选择会话',
+    Empty: '空',
+    'Resize panels': '调整面板大小',
+    'Save layout': '保存布局',
+    'Clear saved layout': '清除已保存的布局',
+    'Layout saved': '布局已保存',
+    'Saved layout cleared': '已清除保存的布局',
+    Waiting: '等待中',
+    Done: '已完成',
+    'Panel A': '面板 A',
+    'Panel B': '面板 B',
+    'Panel C': '面板 C',
+    'Panel D': '面板 D',
+    'Kill all sessions': '终止所有会话',
+    'Manage cases': '管理案例',
+    'Docker isolation': 'Docker 隔离',
+    'Remote SSH hosts': '远程 SSH 主机',
+    'Keyboard shortcuts': '键盘快捷键',
+    Version: '版本',
+    'Check for updates': '检查更新',
+    'Command palette': '命令面板',
+    'Open command palette': '打开命令面板',
+    'Terminal font size': '终端字号',
+    'Applies immediately. Ctrl+Plus and Ctrl+Minus do the same from the keyboard.':
+      '立即生效。也可用 Ctrl+加号 / Ctrl+减号 调整。',
+    'Kill all sessions?': '终止所有会话？',
+    'Kill all': '全部终止',
+    'session(s) will end': '个会话将结束',
+    'This ends every running session and its terminal. It cannot be undone.':
+      '这将结束所有正在运行的会话及其终端，且无法撤销。',
+    'Needs response': '待你回应',
+    'Search sessions': '搜索会话',
+    waiting: '等待输入',
+    done: '已完成',
+    exited: '已退出',
+    'Collapse session list': '收起会话列表',
+    'Expand session list': '展开会话列表',
+    Home: '主页',
+    Usage: '使用情况',
+    updated: '更新于',
+    'Could not load usage data': '无法加载使用数据',
+    'Loading…': '加载中…',
+    'No records yet': '暂无记录',
+    'Usage appears here once Claude Code has written a conversation log.': 'Claude Code 生成对话记录后会显示在这里。',
+    Today: '今日费用',
+    'This week': '本周费用',
+    'Week to date': '本周',
+    'Active sessions': '活跃会话',
+    'Cache hit rate': '缓存命中率',
+    '{n} waiting': '{n} 个等待中',
+    'No records this week yet': '本周暂无记录',
+    'Cost by model': '按模型费用',
+    'Top projects': '项目费用排行',
+    'Plan limits': '订阅额度',
+    '5-hour': '5 小时',
+    Weekly: '每周',
+    'No reading yet': '尚未收到数据',
+    Resets: '重置于',
+    Plenty: '充裕',
+    Watch: '注意',
+    Critical: '告急',
+    Skills: '技能',
+    'MCP servers': 'MCP 服务器',
+    'Skills and plugins': '技能与插件使用',
+    'Tool failures': '工具失败',
+    'Permission denials': '权限拒绝',
+    "Cost is split between days by each session's token share: totals are exact, the day split of a session that spans days is an estimate.":
+      '费用按会话的 Token 占比分摊到各天：总额准确，跨天会话的按日分摊为估算。',
+    '{n} sessions have no recorded cost and are not in the totals.': '{n} 个会话没有费用记录，未计入合计。',
+    '{n} sessions use a model with unknown pricing and are not in the totals.':
+      '{n} 个会话使用了价格未知的模型，未计入合计。',
   });
+
+  // Korean covers ONLY the strings added for Switchboard; anything missing falls back to
+  // English, like zh-CN does. Add a key here when a new Korean string is introduced.
+  const KO_BASE = {
+    Theme: '테마',
+    Dark: '다크',
+    Light: '라이트',
+    System: '시스템',
+    'Skin when dark': '다크일 때 스킨',
+    'Skin when light': '라이트일 때 스킨',
+    'Terminal colors follow the skin.': '터미널 색도 스킨을 따라 바뀝니다.',
+    'Follows the Windows app mode. Now: dark': 'Windows 「기본 앱 모드」를 따릅니다 · 지금은 다크',
+    'Follows the Windows app mode. Now: light': 'Windows 「기본 앱 모드」를 따릅니다 · 지금은 라이트',
+    'Always dark, regardless of Windows.': 'Windows 설정과 무관하게 항상 다크입니다.',
+    'Always light, regardless of Windows.': 'Windows 설정과 무관하게 항상 라이트입니다.',
+    "Changes apply immediately and are saved in this PC's Codeman settings.":
+      '변경 사항은 즉시 적용되며 이 PC의 Codeman 설정에 저장됩니다',
+    'Main menu': '주 메뉴',
+    Session: '세션',
+    Automation: '자동화',
+    Environment: '환경',
+    Settings: '설정',
+    Help: '도움말',
+    'New session': '새 세션',
+    'Split side by side': '좌우로 분할',
+    'Close split': '분할 닫기',
+    'Split top and bottom': '위아래로 분할',
+    'Save layout': '레이아웃 저장',
+    'Clear saved layout': '저장한 레이아웃 지우기',
+    'Kill all sessions': '전체 세션 종료',
+    Respawn: '리스폰',
+    Orchestrator: '오케스트레이터',
+    'Manage cases': '케이스 관리',
+    'Docker isolation': 'Docker 격리',
+    'Remote SSH hosts': '원격 SSH 호스트',
+    'Open app settings': '앱 설정 열기',
+    'Keyboard shortcuts': '단축키',
+    Version: '버전',
+    'Check for updates': '업데이트 확인',
+    'Command palette': '명령 팔레트',
+    'Open command palette': '명령 팔레트 열기',
+    Search: '검색',
+    'Terminal font size': '터미널 글자 크기',
+    'Decrease font size': '글자 작게',
+    'Increase font size': '글자 크게',
+    'Applies immediately. Ctrl+Plus and Ctrl+Minus do the same from the keyboard.':
+      '바로 적용됩니다. 키보드에서는 Ctrl+플러스, Ctrl+마이너스로도 바꿀 수 있습니다.',
+    'Kill all sessions?': '전체 세션을 종료할까요?',
+    'Kill all': '전체 종료',
+    Cancel: '취소',
+    Close: '닫기',
+    'session(s) will end': '개의 세션이 종료됩니다',
+    'This ends every running session and its terminal. It cannot be undone.':
+      '실행 중인 모든 세션과 터미널이 종료되며 되돌릴 수 없습니다.',
+    'Needs response': '응답 대기',
+    Running: '실행 중',
+    Idle: '유휴',
+    'Search sessions': '세션 검색',
+    'needs you': '응답 필요',
+    error: '오류',
+    waiting: '입력 대기',
+    working: '작업 중',
+    idle: '유휴',
+    done: '완료',
+    exited: '종료됨',
+    watching: '감시 중',
+    'Collapse session list': '세션 목록 접기',
+    'Expand session list': '세션 목록 펼치기',
+    Home: '홈',
+    Usage: '사용 현황',
+    updated: '갱신',
+    'Could not load usage data': '사용 현황을 불러오지 못했습니다',
+    'Loading…': '불러오는 중…',
+    'No records yet': '아직 기록이 없습니다',
+    'Usage appears here once Claude Code has written a conversation log.':
+      'Claude Code 대화 기록이 생기면 여기에 표시됩니다.',
+    Today: '오늘 비용',
+    'Week to date': '이번 주',
+    'This week': '이번 주 비용',
+    'Active sessions': '활성 세션',
+    'Cache hit rate': '캐시 적중률',
+    '{n} waiting': '대기 중 {n}개',
+    'No records this week yet': '이번 주에는 아직 기록이 없습니다',
+    'Cost by model': '모델별 비용',
+    'Top projects': '프로젝트별 비용 상위',
+    'Plan limits': '구독 한도',
+    '5-hour': '5시간',
+    Weekly: '주간',
+    'No reading yet': '아직 수신된 값이 없습니다',
+    Resets: '초기화',
+    Plenty: '여유',
+    Watch: '주의',
+    Critical: '임박',
+    Skills: '스킬',
+    'MCP servers': 'MCP 서버',
+    'Skills and plugins': '스킬·플러그인 사용',
+    'Tool failures': '도구 실패',
+    'Permission denials': '권한 거부',
+    "Cost is split between days by each session's token share: totals are exact, the day split of a session that spans days is an estimate.":
+      '비용은 세션의 토큰 비율로 날짜에 나눕니다. 합계는 정확하고, 이틀 이상 걸친 세션의 날짜별 배분은 추정입니다.',
+    '{n} sessions have no recorded cost and are not in the totals.':
+      '비용이 기록되지 않은 세션 {n}개는 합계에 없습니다.',
+    '{n} sessions use a model with unknown pricing and are not in the totals.':
+      '단가를 알 수 없는 모델을 쓴 세션 {n}개는 합계에 없습니다.',
+  };
+
+  // i18n-ko.js (loaded first) carries the Korean strings for the original screens. Switchboard's own
+  // entries above win on a clash.
+  const KO_EXTRA = global.CodemanKoExtra || { exact: {}, patterns: [] };
+  const KO = Object.freeze({ ...KO_EXTRA.exact, ...KO_BASE });
+
+  // Runtime messages with a value inside ("Saved ${name}") or an error after a colon cannot be exact
+  // keys, so they are matched by pattern. Built once; consulted only after an exact lookup misses.
+  const KO_PATTERNS = (KO_EXTRA.patterns || []).map(([source, translation]) => {
+    const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // A "${" with no closing brace is a truncated template: treat what precedes it as a prefix.
+    const cut = source.indexOf('${');
+    const balanced = cut === -1 || source.indexOf('}', cut) !== -1;
+    const text = balanced ? source : source.slice(0, cut);
+    const parts = text.split(/\$\{[^}]*\}/);
+    const prefix = parts.length === 1;
+    const regex = new RegExp(`^${parts.map(escape).join('(.*?)')}${prefix ? '(.*)' : ''}$`, 's');
+    // The text after a prefix is appended as is, so keep the separator the source had.
+    const joined = prefix && text.endsWith(' ') ? translation.replace(/\s*$/, ' ') : translation;
+    return { regex, translation: joined, prefix };
+  });
+
+  function koPattern(source) {
+    for (const { regex, translation, prefix } of KO_PATTERNS) {
+      const match = regex.exec(source);
+      if (!match) continue;
+      if (prefix) return translation + match[1];
+      return translation.replace(/\{(\d+)\}/g, (_m, n) => {
+        const part = match[Number(n)] ?? '';
+        return KO[part] || part;
+      });
+    }
+    return null;
+  }
 
   const ZH_CN_LOWER = new Map(Object.entries(ZH_CN).map(([key, value]) => [key.toLocaleLowerCase('en'), value]));
 
   const textState = new WeakMap();
   const attributeState = new WeakMap();
   let language = normalizeLanguage(global.__codemanLanguage);
-  let displayName = DEFAULT_NAME;
+  let displayName = PRODUCT_NAME;
   let observer = null;
   let applying = false;
 
   function normalizeLanguage(value) {
-    return SUPPORTED_LANGUAGES.has(value) ? value : 'en';
+    // Korean is the default: an unset or unknown value means the user never chose. An explicit 'en' stays English.
+    return SUPPORTED_LANGUAGES.has(value) ? value : 'ko';
   }
 
   function normalizeDisplayName(value) {
-    if (typeof value !== 'string') return DEFAULT_NAME;
+    if (typeof value !== 'string') return PRODUCT_NAME;
     const normalized = value
       .normalize('NFC')
       .replace(/[\u0000-\u001f\u007f]/g, '')
       .trim();
-    return normalized ? Array.from(normalized).slice(0, 40).join('') : DEFAULT_NAME;
+    if (!normalized || normalized === DEFAULT_NAME) return PRODUCT_NAME;
+    return Array.from(normalized).slice(0, 40).join('');
   }
 
   function interpolate(value, variables) {
@@ -978,6 +1338,13 @@
       const translated = ZH_CN[source] || ZH_CN_LOWER.get(source.toLocaleLowerCase('en')) || translateDynamic(source);
       if (translated) return brand(interpolate(translated, vars));
     }
+    if (language === 'ko') {
+      // Markup wraps long sentences across lines; the table is keyed on the single-spaced text.
+      const flat = /\s{2,}|[\n\t]/.test(source) ? source.replace(/\s+/g, ' ') : source;
+      if (KO[flat]) return brand(interpolate(KO[flat], vars));
+      const matched = koPattern(flat);
+      if (matched) return brand(matched);
+    }
     return brand(interpolate(source, vars));
   }
 
@@ -1012,7 +1379,12 @@
   }
 
   function translateAttributes(element) {
-    if (shouldSkip(element) || element.matches('.history-item[title]')) return;
+    // A textarea is skipped for its CONTENT (that is the user's text), but its placeholder is UI copy.
+    const skipped =
+      element.tagName === 'TEXTAREA'
+        ? !element.parentElement || shouldSkip(element.parentElement)
+        : shouldSkip(element);
+    if (skipped || element.matches('.history-item[title]')) return;
     let states = attributeState.get(element);
     if (!states) states = new Map();
     for (const attribute of TRANSLATABLE_ATTRIBUTES) {
@@ -1053,6 +1425,19 @@
     const titleState = document.documentElement.dataset.i18nTitleSource || current;
     document.documentElement.dataset.i18nTitleSource = titleState;
     document.title = brand(titleState);
+  }
+
+  // Dates follow the UI language, not the browser's: call sites pass no locale or a hardcoded 'en'.
+  // Checked at call time, so switching language needs no reload.
+  for (const method of ['toLocaleString', 'toLocaleDateString', 'toLocaleTimeString']) {
+    const native = Date.prototype[method];
+    Date.prototype[method] = function (locales, options) {
+      const unspecified = locales === undefined || (Array.isArray(locales) && locales.length === 0);
+      if (language === 'ko' && (unspecified || (typeof locales === 'string' && /^en(-US)?$/.test(locales)))) {
+        locales = 'ko-KR';
+      }
+      return native.call(this, locales, options);
+    };
   }
 
   function configure(options = {}) {
